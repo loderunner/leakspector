@@ -11,11 +11,11 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    container:
-      image: node:22.9-slim
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -28,11 +28,11 @@ jobs:
         run: pnpm run lint
   test:
     runs-on: ubuntu-latest
-    container:
-      image: node:22.9-slim
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -45,11 +45,11 @@ jobs:
         run: pnpm run test
   build:
     runs-on: ubuntu-latest
-    container:
-      image: node:22.9-slim
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
       - name: Setup node
         uses: actions/setup-node@v4
         with:

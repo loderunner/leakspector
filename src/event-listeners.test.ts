@@ -623,7 +623,7 @@ describe('event-listeners', () => {
       const keys = Object.keys(snapshot);
       const resKey = keys.find((k) => k.startsWith('ServerResponse ('));
       expect(resKey).toBeDefined();
-      expect(resKey).toBe('ServerResponse (200 OK)');
+      expect(resKey).toBe('ServerResponse (200)');
     });
 
     it('should fallback to generic ID for unknown types', () => {

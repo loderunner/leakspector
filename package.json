@@ -1,11 +1,18 @@
 {
   "name": "leakspector",
   "version": "0.0.0",
-  "description": "",
+  "description": "A Node.js library for detecting memory leaks. Track resources at the start of each test and verify they're cleaned up at the end.",
   "type": "module",
   "main": "dist/cjs/index.cjs",
   "module": "dist/esm/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -18,9 +25,29 @@
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "memory-leak",
+    "leak-detection",
+    "testing",
+    "test-utilities",
+    "event-emitter",
+    "event-listener",
+    "vitest",
+    "jest",
+    "resource-tracking",
+    "cleanup",
+    "test-helpers"
+  ],
+  "author": "Charles Francoise",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/loderunner/leakspector.git"
+  },
+  "homepage": "https://github.com/loderunner/leakspector#readme",
+  "bugs": {
+    "url": "https://github.com/loderunner/leakspector/issues"
+  },
   "packageManager": "pnpm@10.18.0",
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -1,0 +1,62 @@
+name: Lint test & build
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22.9-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: sh
+        run: pnpm install
+      - name: Run linter
+        run: pnpm run lint
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22.9-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: sh
+        run: pnpm install
+      - name: Run tests
+        run: pnpm run test
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22.9-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: sh
+        run: pnpm install
+      - name: Build project
+        run: pnpm run build

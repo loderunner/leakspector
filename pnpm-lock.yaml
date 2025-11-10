@@ -16,7 +16,7 @@ importers:
         version: 24.10.0
       '@vitest/eslint-plugin':
         specifier: ^1.4.2
-        version: 1.4.2(eslint@9.39.1)(typescript@5.9.3)(vitest@4.0.8(@types/node@24.10.0)(tsx@4.20.6))
+        version: 1.4.2(eslint@9.39.1)(typescript@5.9.3)(vitest@4.0.8(@types/node@24.10.0))
       eslint:
         specifier: ^9.39.1
         version: 9.39.1
@@ -41,9 +41,6 @@ importers:
       tsdown:
         specifier: ^0.16.1
         version: 0.16.1(typescript@5.9.3)
-      tsx:
-        specifier: ^4.20.6
-        version: 4.20.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -52,7 +49,7 @@ importers:
         version: 8.46.3(eslint@9.39.1)(typescript@5.9.3)
       vitest:
         specifier: ^4.0.8
-        version: 4.0.8(@types/node@24.10.0)(tsx@4.20.6)
+        version: 4.0.8(@types/node@24.10.0)
 
 packages:
 
@@ -1613,8 +1610,8 @@ packages:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
 
-  rolldown-plugin-dts@0.17.4:
-    resolution: {integrity: sha512-eWno7CR/Da2jA+5mTHxeMx78p4AmoUocEKDQT8XKwhq9Oroyf67ZfBOE82d4EvDjktiQTePpKdIKc69pND88Og==}
+  rolldown-plugin-dts@0.17.5:
+    resolution: {integrity: sha512-dYzjLdhgsSIPmOCPJdDXiD6AUotAHVkGLNlSMdi3VmvTqk7O9H7uGzG2WGzgnDxZq6kZh31vZUbp9ZFoOhpySA==}
     engines: {node: '>=20.18.0'}
     peerDependencies:
       '@ts-macro/tsc': ^0.3.6
@@ -1827,11 +1824,6 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  tsx@4.20.6:
-    resolution: {integrity: sha512-ytQKuwgmrrkDTFP4LjR0ToE2nqgy886GpvRSpU0JAnrdBYppuY5rLkRUYPU1yCryb24SsKBTL/hlDQAEFVwtZg==}
-    engines: {node: '>=18.0.0'}
-    hasBin: true
-
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -1877,8 +1869,8 @@ packages:
   unrs-resolver@1.11.1:
     resolution: {integrity: sha512-bSjt9pjaEBnNiGgc9rUiHGKv5l4/TGzDmYw3RhnkJGtLhbnnA/5qJj7x3dNDCRx/PJxu774LlH8lCOlB4hEfKg==}
 
-  unrun@0.2.6:
-    resolution: {integrity: sha512-ZLgMe3W+Zl3mjpnCbfW0JLlGQDa7U4mJKiBlValp5isZ9WeoAVaNyziCbr5Szo4abZ6WRE3OM1MjwpfFQrE5Aw==}
+  unrun@0.2.7:
+    resolution: {integrity: sha512-GqUSQ+Mr1R0QDKrYM2eEjgm+kec+BQyfDltgLKFAPnqrzuxWJhgUOJWSNG+rmAFEqPPNQP2bOUo1c1Q0IpVa8g==}
     engines: {node: '>=20.19.0'}
     hasBin: true
     peerDependencies:
@@ -2522,14 +2514,14 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.11.1':
     optional: true
 
-  '@vitest/eslint-plugin@1.4.2(eslint@9.39.1)(typescript@5.9.3)(vitest@4.0.8(@types/node@24.10.0)(tsx@4.20.6))':
+  '@vitest/eslint-plugin@1.4.2(eslint@9.39.1)(typescript@5.9.3)(vitest@4.0.8(@types/node@24.10.0))':
     dependencies:
       '@typescript-eslint/scope-manager': 8.46.3
       '@typescript-eslint/utils': 8.46.3(eslint@9.39.1)(typescript@5.9.3)
       eslint: 9.39.1
     optionalDependencies:
       typescript: 5.9.3
-      vitest: 4.0.8(@types/node@24.10.0)(tsx@4.20.6)
+      vitest: 4.0.8(@types/node@24.10.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -2542,13 +2534,13 @@ snapshots:
       chai: 6.2.0
       tinyrainbow: 3.0.3
 
-  '@vitest/mocker@4.0.8(vite@7.2.2(@types/node@24.10.0)(tsx@4.20.6))':
+  '@vitest/mocker@4.0.8(vite@7.2.2(@types/node@24.10.0))':
     dependencies:
       '@vitest/spy': 4.0.8
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.2.2(@types/node@24.10.0)(tsx@4.20.6)
+      vite: 7.2.2(@types/node@24.10.0)
 
   '@vitest/pretty-format@4.0.8':
     dependencies:
@@ -3532,7 +3524,7 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  rolldown-plugin-dts@0.17.4(rolldown@1.0.0-beta.47)(typescript@5.9.3):
+  rolldown-plugin-dts@0.17.5(rolldown@1.0.0-beta.47)(typescript@5.9.3):
     dependencies:
       '@babel/generator': 7.28.5
       '@babel/parser': 7.28.5
@@ -3783,13 +3775,13 @@ snapshots:
       empathic: 2.0.0
       hookable: 5.5.3
       rolldown: 1.0.0-beta.47
-      rolldown-plugin-dts: 0.17.4(rolldown@1.0.0-beta.47)(typescript@5.9.3)
+      rolldown-plugin-dts: 0.17.5(rolldown@1.0.0-beta.47)(typescript@5.9.3)
       semver: 7.7.3
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tree-kill: 1.2.2
       unconfig-core: 7.4.0
-      unrun: 0.2.6
+      unrun: 0.2.7
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -3802,13 +3794,6 @@ snapshots:
 
   tslib@2.8.1:
     optional: true
-
-  tsx@4.20.6:
-    dependencies:
-      esbuild: 0.25.12
-      get-tsconfig: 4.13.0
-    optionalDependencies:
-      fsevents: 2.3.3
 
   type-check@0.4.0:
     dependencies:
@@ -3898,7 +3883,7 @@ snapshots:
       '@unrs/resolver-binding-win32-ia32-msvc': 1.11.1
       '@unrs/resolver-binding-win32-x64-msvc': 1.11.1
 
-  unrun@0.2.6:
+  unrun@0.2.7:
     dependencies:
       '@oxc-project/runtime': 0.96.0
       rolldown: 1.0.0-beta.47
@@ -3907,7 +3892,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  vite@7.2.2(@types/node@24.10.0)(tsx@4.20.6):
+  vite@7.2.2(@types/node@24.10.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.3)
@@ -3918,12 +3903,11 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.10.0
       fsevents: 2.3.3
-      tsx: 4.20.6
 
-  vitest@4.0.8(@types/node@24.10.0)(tsx@4.20.6):
+  vitest@4.0.8(@types/node@24.10.0):
     dependencies:
       '@vitest/expect': 4.0.8
-      '@vitest/mocker': 4.0.8(vite@7.2.2(@types/node@24.10.0)(tsx@4.20.6))
+      '@vitest/mocker': 4.0.8(vite@7.2.2(@types/node@24.10.0))
       '@vitest/pretty-format': 4.0.8
       '@vitest/runner': 4.0.8
       '@vitest/snapshot': 4.0.8
@@ -3940,7 +3924,7 @@ snapshots:
       tinyexec: 0.3.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vite: 7.2.2(@types/node@24.10.0)(tsx@4.20.6)
+      vite: 7.2.2(@types/node@24.10.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 24.10.0

@@ -1,0 +1,40 @@
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+name: release-please
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v5
+      - name: Setup node
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        if: ${{ steps.release.outputs.release_created }}
+        shell: sh
+        run: pnpm install
+      - name: Publish to NPM registry
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          pnpm set "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}"
+          pnpm publish
+        shell: sh

@@ -38,7 +38,5 @@ jobs:
         run: pnpm install
       - name: Publish to NPM registry
         if: ${{ steps.release.outputs.release_created }}
-        run: |
-          pnpm set "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}"
-          pnpm publish
+        run: pnpm publish
         shell: sh

@@ -26,14 +26,14 @@ export function track(): void {
  * Checks for leaks.
  *
  * @param options - Configuration options for leak checking.
- * @param options.forceGC - Whether to force garbage collection before checking.
+ * @param options.forceGC - Whether to force garbage collection before checking. Defaults to true if node was run with --expose-gc flag.
  * @param options.throwOnLeaks - Whether to throw an error if leaks are detected. Defaults to true.
  *
  * @throws {Error} If leak detection is not set up. Call track() first.
  * @throws {Error} If leaks are detected and throwOnLeaks is true.
  
  */
-export function check(options: {
+export function check(options?: {
   forceGC?: boolean;
   throwOnLeaks?: boolean;
 }): Promise<void> {

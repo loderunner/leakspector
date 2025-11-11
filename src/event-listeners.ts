@@ -321,13 +321,15 @@ export async function checkEventListeners(options?: {
   forceGC?: boolean;
   throwOnLeaks?: boolean;
 }): Promise<void> {
+  const { forceGC = global.gc !== undefined, throwOnLeaks = true } =
+    options ?? {};
   if (originalOn === null) {
     throw new Error(
       'Event listener leak detection not set up. Call trackEventListeners() first.',
     );
   }
 
-  if (options?.forceGC === true) {
+  if (forceGC) {
     await forceGarbageCollection();
   }
 
@@ -385,7 +387,6 @@ export async function checkEventListeners(options?: {
         )
         .join('\n');
 
-    const throwOnLeaks = options?.throwOnLeaks !== false;
     if (throwOnLeaks) {
       throw new Error(message);
     }

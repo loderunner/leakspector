@@ -1,6 +1,6 @@
 {
   "name": "leakspector",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A Node.js library for detecting memory leaks. Track resources at the start of each test and verify they're cleaned up at the end.",
   "type": "module",
   "main": "dist/cjs/index.cjs",

@@ -22,6 +22,8 @@ jobs:
       - name: Checkout
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/checkout@v5
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
       - name: Setup node
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-node@v6

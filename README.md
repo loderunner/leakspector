@@ -93,7 +93,7 @@ export default {
   // ...
   test: {
     // ...
-    nodeOptions: ['--expose-gc'],
+    execArgv: ['--expose-gc'],
   },
 };
 ```

@@ -961,24 +961,12 @@ describe('event-listeners', () => {
       await checkEventListeners({ format: 'details', throwOnLeaks: false });
 
       const message = consoleErrorSpy.mock.calls[0][0] as string;
-      // Verify emitter creation stack trace: EventEmitter#1 followed by file:line:col format
-      expect(message).toMatch(
-        /EventEmitter#1\s+[^\s]+event-listeners\.test\.ts:\d+:\d+/,
-      );
-      const emitterMatch = message.match(
-        /EventEmitter#1\s+[^\s]+event-listeners\.test\.ts:(\d+):\d+/,
-      );
-      const emitterLine = parseInt(emitterMatch![1], 10);
+      // Verify emitter ID is present (without stack trace)
+      expect(message).toMatch(/EventEmitter#1/);
 
       // Verify listener addition stack trace: * on('test') followed by file:line:col format
-      // And the line number should be 1 line after the emitter creation line
-      expect(
-        message,
-        'Listener addition stack trace should be 1 line after the emitter creation line',
-      ).toMatch(
-        new RegExp(
-          `\\* on\\('test'\\)\\s+[^\\s]+event-listeners\\.test\\.ts:${emitterLine + 1}:\\d+`,
-        ),
+      expect(message).toMatch(
+        /\* on\('test'\)\s+[^\s]+event-listeners\.test\.ts:\d+:\d+/,
       );
 
       consoleErrorSpy.mockRestore();

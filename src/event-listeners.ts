@@ -23,7 +23,6 @@ let emitterInitialState = new WeakMap<EventEmitter<any>, EventCounts>();
 const allEmitters = new Set<EventEmitter<any>>();
 const emitterIds = new WeakMap<EventEmitter<any>, string>();
 const constructorCounts = new Map<string, number>();
-let emitterCreationStacks = new WeakMap<EventEmitter<any>, string>();
 let listenerAdditions = new WeakMap<EventEmitter<any>, ListenerAddition[]>();
 
 let originalOn: typeof EventEmitter.prototype.on | null = null;
@@ -198,90 +197,6 @@ function getEmitterId(emitter: EventEmitter<any>): string {
 }
 
 /**
- * Captures the full stack trace without filtering.
- *
- * @returns The full stack trace string, or empty string if unavailable.
- */
-function captureStackTrace(): string {
-  const error = new Error();
-  return error.stack ?? '';
-}
-
-/**
- * Formats a stack trace to show only the first relevant user code frame.
- * Filters out Node.js internal frames and leakspector frames.
- * Includes node_modules frames if they're the first non-internal frame.
- *
- * @param stack - The full stack trace string.
- * @returns Formatted frame as `path/to/file.ts:line:col`, or empty string if no relevant frame found.
- */
-function formatStackTrace(stack: string): string {
-  if (stack === '') {
-    return '';
-  }
-
-  const lines = stack.split('\n');
-  for (const line of lines) {
-    // Skip Error message line
-    if (line.trim().startsWith('Error:')) {
-      continue;
-    }
-
-    // Skip empty lines
-    if (line.trim() === '') {
-      continue;
-    }
-
-    // Skip Node.js internal frames
-    if (
-      line.includes('node:') ||
-      line.includes(' internal/') ||
-      line.includes('(node:')
-    ) {
-      continue;
-    }
-
-    // Skip leakspector frames (but allow test files)
-    if (
-      (line.includes('leakspector') || line.includes('event-listeners.ts')) &&
-      !line.includes('.test.')
-    ) {
-      continue;
-    }
-
-    // Extract file path, line, and column
-    // Stack trace format: "    at functionName (file:line:col)" or "    at file:line:col"
-    // Try format with parentheses first (most common)
-    const matchWithParens = line.match(/at .+ \((.+):(\d+):(\d+)\)/);
-    if (matchWithParens !== null) {
-      const file = matchWithParens[1];
-      const lineNum = matchWithParens[2];
-      const col = matchWithParens[3];
-      // Skip if it's still a leakspector internal file
-      if (file.includes('event-listeners.ts') && !file.includes('.test.')) {
-        continue;
-      }
-      return `${file}:${lineNum}:${col}`;
-    }
-
-    // Try format without parentheses
-    const matchWithoutParens = line.match(/at (.+):(\d+):(\d+)/);
-    if (matchWithoutParens !== null) {
-      const file = matchWithoutParens[1];
-      const lineNum = matchWithoutParens[2];
-      const col = matchWithoutParens[3];
-      // Skip if it's still a leakspector internal file
-      if (file.includes('event-listeners.ts') && !file.includes('.test.')) {
-        continue;
-      }
-      return `${file}:${lineNum}:${col}`;
-    }
-  }
-
-  return '';
-}
-
-/**
  * Starts tracking event listeners on all EventEmitter instances.
  * Must be called before creating EventEmitter instances to track.
  *
@@ -312,10 +227,10 @@ export function trackEventListeners(): void {
   EventEmitter.prototype.on = EventEmitter.prototype.addListener = function (
     ...args: Parameters<typeof EventEmitter.prototype.on>
   ) {
+    // For emitters created before tracking started, initialize them now
     if (!allEmitters.has(this)) {
       allEmitters.add(this);
       getEmitterId(this);
-      emitterCreationStacks.set(this, captureStackTrace());
       const initialState: Record<string | symbol, number> = {};
       const eventNames = this.eventNames();
       for (const eventName of eventNames) {
@@ -345,10 +260,10 @@ export function trackEventListeners(): void {
   EventEmitter.prototype.once = function (
     ...args: Parameters<typeof EventEmitter.prototype.once>
   ) {
+    // For emitters created before tracking started, initialize them now
     if (!allEmitters.has(this)) {
       allEmitters.add(this);
       getEmitterId(this);
-      emitterCreationStacks.set(this, captureStackTrace());
       const initialState: Record<string | symbol, number> = {};
       const eventNames = this.eventNames();
       for (const eventName of eventNames) {
@@ -360,12 +275,13 @@ export function trackEventListeners(): void {
 
     const [eventName, listener] = args;
     if (eventName !== undefined) {
+      const stack = captureStackTrace();
       const additions = listenerAdditions.get(this) ?? [];
       additions.push({
         eventName: eventName as EventName,
         method: 'once',
         fn: listener as (...args: unknown[]) => void,
-        stack: captureStackTrace(),
+        stack,
         removed: false,
       });
       listenerAdditions.set(this, additions);
@@ -499,7 +415,6 @@ export async function checkEventListeners(options?: {
   allEmitters.clear();
   emitterInitialState = new WeakMap<EventEmitter<any>, EventCounts>();
   constructorCounts.clear();
-  emitterCreationStacks = new WeakMap<EventEmitter<any>, string>();
   listenerAdditions = new WeakMap<EventEmitter<any>, ListenerAddition[]>();
 
   if (message !== '') {
@@ -598,10 +513,6 @@ function formatDetailsMessage(): string {
     }
 
     const emitterId = getEmitterId(emitter);
-    const creationStack = emitterCreationStacks.get(emitter);
-    const formattedStack =
-      creationStack !== undefined ? formatStackTrace(creationStack) : '';
-    const stackPart = formattedStack !== '' ? ` ${formattedStack}` : '';
     // All listener additions for this emitter (includes removed ones)
     const additions = listenerAdditions.get(emitter) ?? [];
     const eventNames = emitter.eventNames();
@@ -633,7 +544,7 @@ function formatDetailsMessage(): string {
         hasLeaks = true;
       }
 
-      lines.push(`  ${emitterId}${stackPart}`);
+      lines.push(`  ${emitterId}`);
 
       // Second pass: for each leaked event, show which listeners leaked
       for (const leak of leaks) {
@@ -664,6 +575,118 @@ function formatDetailsMessage(): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Captures the full stack trace without filtering.
+ *
+ * @returns The full stack trace string, or empty string if unavailable.
+ */
+function captureStackTrace(): string {
+  const error = new Error();
+  return error.stack ?? '';
+}
+
+/**
+ * Extracts file location from a stack trace line.
+ *
+ * @param line - A single line from a stack trace.
+ * @returns Formatted frame as `path/to/file.ts:line:col`, or null if not parseable.
+ */
+function extractLocationFromLine(line: string): string | null {
+  // Try format with parentheses first (most common)
+  const matchWithParens = line.match(/at .+ \((.+):(\d+):(\d+)\)/);
+  if (matchWithParens !== null) {
+    const file = matchWithParens[1];
+    const lineNum = matchWithParens[2];
+    const col = matchWithParens[3];
+    return `${file}:${lineNum}:${col}`;
+  }
+
+  // Try format without parentheses
+  const matchWithoutParens = line.match(/at (.+):(\d+):(\d+)/);
+  if (matchWithoutParens !== null) {
+    const file = matchWithoutParens[1];
+    const lineNum = matchWithoutParens[2];
+    const col = matchWithoutParens[3];
+    return `${file}:${lineNum}:${col}`;
+  }
+
+  return null;
+}
+
+/**
+ * Checks if a stack trace line should be filtered out.
+ *
+ * @param line - A single line from a stack trace.
+ * @returns True if the line should be skipped.
+ */
+function shouldSkipStackLine(line: string): boolean {
+  // Skip Error message line
+  if (line.trim().startsWith('Error:')) {
+    return true;
+  }
+
+  // Skip empty lines
+  if (line.trim() === '') {
+    return true;
+  }
+
+  // Skip Node.js internal frames
+  if (
+    line.includes('node:') ||
+    line.includes(' internal/') ||
+    line.includes('(node:')
+  ) {
+    return true;
+  }
+
+  // Skip leakspector frames (but allow test files)
+  if (
+    (line.includes('leakspector') || line.includes('event-listeners.ts')) &&
+    !line.includes('.test.')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Formats a stack trace to show only the first relevant user code frame.
+ * Filters out Node.js internal frames and leakspector frames.
+ * Includes node_modules frames if they're the first non-internal frame.
+ *
+ * @param stack - The full stack trace string.
+ * @returns Formatted frame as `path/to/file.ts:line:col`, or empty string if no relevant frame found.
+ */
+function formatStackTrace(stack: string): string {
+  if (stack === '') {
+    return '';
+  }
+
+  const lines = stack.split('\n');
+
+  for (const line of lines) {
+    if (shouldSkipStackLine(line)) {
+      continue;
+    }
+
+    const location = extractLocationFromLine(line);
+    if (location === null) {
+      continue;
+    }
+
+    // Skip if it's still a leakspector internal file
+    const file = location.split(':')[0];
+    if (file.includes('event-listeners.ts') && !file.includes('.test.')) {
+      continue;
+    }
+
+    return location;
+  }
+
+  return '';
 }
 
 /**

@@ -265,7 +265,7 @@ function formatStackTrace(stack: string): string {
     }
 
     // Try format without parentheses
-    const matchWithoutParens = line.match(/at .+ (.+):(\d+):(\d+)/);
+    const matchWithoutParens = line.match(/at (.+):(\d+):(\d+)/);
     if (matchWithoutParens !== null) {
       const file = matchWithoutParens[1];
       const lineNum = matchWithoutParens[2];
@@ -326,7 +326,7 @@ export function trackEventListeners(): void {
     }
 
     const [eventName, listener] = args;
-    if (eventName !== undefined && listener !== undefined) {
+    if (eventName !== undefined) {
       const stack = captureStackTrace();
       const additions = listenerAdditions.get(this) ?? [];
       additions.push({
@@ -359,7 +359,7 @@ export function trackEventListeners(): void {
     }
 
     const [eventName, listener] = args;
-    if (eventName !== undefined && listener !== undefined) {
+    if (eventName !== undefined) {
       const additions = listenerAdditions.get(this) ?? [];
       additions.push({
         eventName: eventName as EventName,
@@ -639,7 +639,7 @@ function formatDetailsMessage(): string {
       for (const leak of leaks) {
         const leakedCount = leak.actual - leak.expected;
         lines.push(
-          `  > Event '${String(leak.eventName)}': expected ${leak.expected} listener(s), found ${leak.actual} (+${leakedCount} leaked)`,
+          `  > '${String(leak.eventName)}': expected ${leak.expected} listener(s), found ${leak.actual} (+${leakedCount} leaked)`,
         );
 
         // Filter additions to find only the ones that weren't removed (i.e., leaked)

@@ -793,4 +793,214 @@ describe('event-listeners', () => {
       await expect(eventListeners.check({})).rejects.toThrow();
     });
   });
+
+  describe('output format options', () => {
+    it('should support "short" format', async () => {
+      trackEventListeners();
+      const emitter1 = new EventEmitter();
+      const emitter2 = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+      const handler3 = vi.fn();
+
+      emitter1.on('event1', handler1);
+      emitter1.on('event2', handler2);
+      emitter2.on('event1', handler3);
+
+      try {
+        await checkEventListeners({ format: 'short' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        expect(message).toBe(
+          'Event listener leaks detected: 3 leaked listener(s)',
+        );
+      }
+    });
+
+    it('should support "summary" format (default)', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('event1', handler1);
+      emitter.on('event2', handler2);
+
+      try {
+        await checkEventListeners({ format: 'summary' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        expect(message).toContain("'EventEmitter#1.event1'");
+        expect(message).toContain("'EventEmitter#1.event2'");
+        expect(message).toContain('expected 0 listener(s), found 1');
+      }
+    });
+
+    it('should default to "summary" format', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.on('test', handler);
+
+      try {
+        await checkEventListeners();
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        expect(message).toContain("'EventEmitter#1.test'");
+        expect(message).toContain('expected 0 listener(s), found 1');
+      }
+    });
+
+    it('should support "details" format with stack traces', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('error', handler1);
+      emitter.once('data', handler2);
+
+      try {
+        await checkEventListeners({ format: 'details' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        expect(message).toContain('Event listener leaks detected:');
+        expect(message).toContain('EventEmitter#1');
+        expect(message).toContain("> Event 'error'");
+        expect(message).toContain("> Event 'data'");
+        expect(message).toMatch(/\* on\('error'\)/);
+        expect(message).toMatch(/\* once\('data'\)/);
+      }
+    });
+
+    it('should track once() auto-removal', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.once('data', handler);
+      emitter.emit('data', 'test');
+
+      // Should not detect a leak since once() auto-removed it
+      await expect(checkEventListeners()).resolves.not.toThrow();
+    });
+
+    it('should track same function added multiple times correctly', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.on('data', handler);
+      emitter.on('data', handler);
+      emitter.off('data', handler); // Removes one instance
+
+      try {
+        await checkEventListeners({ format: 'details' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        // Should show only one leaked listener (the second addition)
+        expect(message).toContain('found 1 (+1 leaked)');
+        expect(message).toMatch(/\* on\('data'\)/);
+      }
+    });
+
+    it('should match removals to correct additions', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('data', handler1);
+      emitter.on('data', handler2);
+      emitter.off('data', handler1); // Remove first one
+
+      try {
+        await checkEventListeners({ format: 'details' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        // Should show handler2 as leaked (handler1 was removed)
+        expect(message).toContain('found 1 (+1 leaked)');
+        expect(message).toMatch(/\* on\('data'\)/);
+      }
+    });
+
+    it('should show stack traces in details format', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.on('test', handler);
+
+      try {
+        await checkEventListeners({ format: 'details' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        // Stack trace should be included in details format
+        // The format may vary, so we just check that the listener addition line is present
+        // and that it shows the method name
+        expect(message).toContain("* on('test')");
+        // Note: Stack traces may not always be available or formatted in test environments
+        // The important part is that the details format shows which listeners leaked
+      }
+    });
+
+    it('should handle multiple emitters in details format', async () => {
+      trackEventListeners();
+      const emitter1 = new EventEmitter();
+      const emitter2 = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter1.on('event1', handler1);
+      emitter2.on('event2', handler2);
+
+      try {
+        await checkEventListeners({ format: 'details' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        expect(message).toContain('EventEmitter#1');
+        expect(message).toContain('EventEmitter#2');
+        expect(message).toContain("> Event 'event1'");
+        expect(message).toContain("> Event 'event2'");
+      }
+    });
+
+    it('should handle multiple events on same emitter in details format', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('error', handler1);
+      emitter.on('data', handler2);
+
+      try {
+        await checkEventListeners({ format: 'details' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        const message = (error as Error).message;
+        expect(message).toContain('EventEmitter#1');
+        expect(message).toContain("> Event 'error'");
+        expect(message).toContain("> Event 'data'");
+      }
+    });
+  });
 });

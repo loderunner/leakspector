@@ -130,6 +130,12 @@ Call this in `afterEach`.
   checking. Defaults to `false`.
 - `options.throwOnLeaks` (optional): Whether to throw an error if leaks are
   detected. Defaults to `true`.
+- `options.format` (optional): Output format for error messages. Defaults to
+  `"summary"`.
+  - `"short"`: Terse, leak count only
+  - `"summary"`: List of leaks with counts (default behavior)
+  - `"details"`: Detailed output with stack traces showing where leaks were
+    created
 
 **Returns:** `Promise<void>`
 
@@ -140,6 +146,35 @@ Call this in `afterEach`.
 
 **Note:** After calling `check()`, tracking is reset. You must call `track()`
 again in the next `beforeEach` to start a new tracking session.
+
+#### Output Formats
+
+##### Short Format
+
+```typescript
+await check({ format: 'short' });
+// Error: Event listener leaks detected: 5 leaked listener(s)
+```
+
+##### Summary Format (Default)
+
+```typescript
+await check({ format: 'summary' });
+// Error: Event listener leaks detected:
+//   Event 'EventEmitter#1.error': expected 0 listener(s), found 1 (+1 leaked)
+//   Event 'EventEmitter#1.data': expected 0 listener(s), found 1 (+1 leaked)
+```
+
+##### Details Format
+
+```typescript
+await check({ format: 'details' });
+// Error: Event listener leaks detected:
+//   EventEmitter#1
+//   > 'error': expected 0 listener(s), found 2 (+2 leaked)
+//       * on('error') path/to/event-listening-file.ts:301:4
+//       * once('error') path/to/other/file.ts:22:2
+```
 
 ## What Gets Tracked
 

@@ -793,4 +793,234 @@ describe('event-listeners', () => {
       await expect(eventListeners.check({})).rejects.toThrow();
     });
   });
+
+  describe('output format options', () => {
+    it('should support "short" format', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter1 = new EventEmitter();
+      const emitter2 = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+      const handler3 = vi.fn();
+
+      emitter1.on('event1', handler1);
+      emitter1.on('event2', handler2);
+      emitter2.on('event1', handler3);
+
+      await checkEventListeners({ format: 'short', throwOnLeaks: false });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Event listener leaks detected: 3 leaked listener(s)',
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should support "summary" format (default)', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('event1', handler1);
+      emitter.on('event2', handler2);
+
+      await checkEventListeners({ format: 'summary', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      expect(message).toContain("'EventEmitter#1.event1'");
+      expect(message).toContain("'EventEmitter#1.event2'");
+      expect(message).toContain('expected 0 listener(s), found 1');
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should default to "summary" format', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.on('test', handler);
+
+      await checkEventListeners({ throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      expect(message).toContain("'EventEmitter#1.test'");
+      expect(message).toContain('expected 0 listener(s), found 1');
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should support "details" format with stack traces', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('error', handler1);
+      emitter.once('data', handler2);
+
+      await checkEventListeners({ format: 'details', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      expect(message).toContain('Event listener leaks detected:');
+      expect(message).toContain('EventEmitter#1');
+      expect(message).toContain("> 'error'");
+      expect(message).toContain("> 'data'");
+      expect(message).toMatch(/\* on\('error'\)/);
+      expect(message).toMatch(/\* once\('data'\)/);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should track once() auto-removal', async () => {
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.once('data', handler);
+      emitter.emit('data', 'test');
+
+      // Should not detect a leak since once() auto-removed it
+      await expect(checkEventListeners()).resolves.not.toThrow();
+    });
+
+    it('should track same function added multiple times correctly', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+
+      emitter.on('data', handler);
+      emitter.on('data', handler);
+      emitter.off('data', handler); // Removes one instance
+
+      await checkEventListeners({ format: 'details', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      // Should show only one leaked listener (the second addition)
+      expect(message).toContain('found 1 (+1 leaked)');
+      expect(message).toMatch(/\* on\('data'\)/);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should match removals to correct additions', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('data', handler1);
+      emitter.on('data', handler2);
+      emitter.off('data', handler1); // Remove first one
+
+      await checkEventListeners({ format: 'details', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      // Should show handler2 as leaked (handler1 was removed)
+      expect(message).toContain('found 1 (+1 leaked)');
+      expect(message).toMatch(/\* on\('data'\)/);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should show stack traces in details format', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const handler = vi.fn();
+      const emitter = new EventEmitter();
+      emitter.on('test', handler);
+
+      await checkEventListeners({ format: 'details', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      // Verify emitter ID is present (without stack trace)
+      expect(message).toMatch(/EventEmitter#1/);
+
+      // Verify listener addition stack trace: * on('test') followed by file:line:col format
+      expect(message).toMatch(
+        /\* on\('test'\)\s+[^\s]+event-listeners\.test\.ts:\d+:\d+/,
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle multiple emitters in details format', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter1 = new EventEmitter();
+      const emitter2 = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter1.on('event1', handler1);
+      emitter2.on('event2', handler2);
+
+      await checkEventListeners({ format: 'details', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      // expect(message).toContain('EventEmitter#1');
+      // expect(message).toContain('EventEmitter#2');
+      // expect(message).toContain("> 'event1'");
+      // expect(message).toContain("> 'event2'");
+      expect(message).toMatch(
+        /EventEmitter#1[\s\S]*> 'event1'[\s\S]*EventEmitter#2[\s\S]*> 'event2'/,
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle multiple events on same emitter in details format', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      trackEventListeners();
+      const emitter = new EventEmitter();
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      emitter.on('error', handler1);
+      emitter.on('data', handler2);
+
+      await checkEventListeners({ format: 'details', throwOnLeaks: false });
+
+      const message = consoleErrorSpy.mock.calls[0][0] as string;
+      expect(message).toContain('EventEmitter#1');
+      expect(message).toContain("> 'error'");
+      expect(message).toContain("> 'data'");
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
 });

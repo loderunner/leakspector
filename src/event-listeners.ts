@@ -11,10 +11,19 @@ type EventName = string | symbol;
 type EventCounts = Record<EventName, number>;
 type ListenersSnapshot = Record<string, EventCounts>;
 
+type ListenerAddition = {
+  eventName: EventName;
+  method: 'on' | 'once' | 'addListener';
+  fn: (...args: unknown[]) => void;
+  stack: string;
+  removed: boolean;
+};
+
 let emitterInitialState = new WeakMap<EventEmitter<any>, EventCounts>();
 const allEmitters = new Set<EventEmitter<any>>();
 const emitterIds = new WeakMap<EventEmitter<any>, string>();
 const constructorCounts = new Map<string, number>();
+let listenerAdditions = new WeakMap<EventEmitter<any>, ListenerAddition[]>();
 
 let originalOn: typeof EventEmitter.prototype.on | null = null;
 let originalAddListener: typeof EventEmitter.prototype.addListener | null =
@@ -218,6 +227,7 @@ export function trackEventListeners(): void {
   EventEmitter.prototype.on = EventEmitter.prototype.addListener = function (
     ...args: Parameters<typeof EventEmitter.prototype.on>
   ) {
+    // For emitters created before tracking started, initialize them now
     if (!allEmitters.has(this)) {
       allEmitters.add(this);
       getEmitterId(this);
@@ -227,13 +237,30 @@ export function trackEventListeners(): void {
         initialState[eventName] = this.listenerCount(eventName);
       }
       emitterInitialState.set(this, initialState);
+      listenerAdditions.set(this, []);
     }
+
+    const [eventName, listener] = args;
+    if (eventName !== undefined) {
+      const stack = captureStackTrace();
+      const additions = listenerAdditions.get(this) ?? [];
+      additions.push({
+        eventName: eventName as EventName,
+        method: 'on',
+        fn: listener as (...args: unknown[]) => void,
+        stack,
+        removed: false,
+      });
+      listenerAdditions.set(this, additions);
+    }
+
     return originalOn!.apply(this, args);
   };
 
   EventEmitter.prototype.once = function (
     ...args: Parameters<typeof EventEmitter.prototype.once>
   ) {
+    // For emitters created before tracking started, initialize them now
     if (!allEmitters.has(this)) {
       allEmitters.add(this);
       getEmitterId(this);
@@ -243,7 +270,23 @@ export function trackEventListeners(): void {
         initialState[eventName] = this.listenerCount(eventName);
       }
       emitterInitialState.set(this, initialState);
+      listenerAdditions.set(this, []);
     }
+
+    const [eventName, listener] = args;
+    if (eventName !== undefined) {
+      const stack = captureStackTrace();
+      const additions = listenerAdditions.get(this) ?? [];
+      additions.push({
+        eventName: eventName as EventName,
+        method: 'once',
+        fn: listener as (...args: unknown[]) => void,
+        stack,
+        removed: false,
+      });
+      listenerAdditions.set(this, additions);
+    }
+
     return originalOnce!.apply(this, args);
   };
 
@@ -251,6 +294,19 @@ export function trackEventListeners(): void {
     function (
       ...args: Parameters<typeof EventEmitter.prototype.removeListener>
     ) {
+      const [eventName, listener] = args;
+      if (eventName !== undefined) {
+        const additions = listenerAdditions.get(this);
+        if (additions !== undefined) {
+          // Find the first matching addition that hasn't been removed
+          const addition = additions.find(
+            (a) => a.eventName === eventName && a.fn === listener && !a.removed,
+          );
+          if (addition !== undefined) {
+            addition.removed = true;
+          }
+        }
+      }
       return originalRemoveListener!.apply(this, args);
     };
 }
@@ -288,13 +344,6 @@ export function snapshotEventListeners(): ListenersSnapshot {
   return snapshot;
 }
 
-type ListenerLeak = {
-  emitter: EventEmitter<any>;
-  eventName: EventName;
-  expected: number;
-  actual: number;
-};
-
 /**
  * Checks for event listener leaks by comparing current listener counts against initial state.
  * Throws an error if any leaks are detected.
@@ -302,6 +351,10 @@ type ListenerLeak = {
  * @param options - Configuration options for leak checking.
  * @param options.forceGC - Whether to force garbage collection before checking.
  * @param options.throwOnLeaks - Whether to throw an error if leaks are detected. Defaults to true.
+ * @param options.format - Output format for error messages. Defaults to `"summary"`.
+ * - `"short"`: Terse count only (e.g. `"Event listener leaks detected: 5 leaked listener(s)"`)
+ * - `"summary"`: List of leaked events with counts
+ * - `"details"`: Detailed output with stack traces showing where EventEmitters were created and where listeners were added
  *
  * @throws {Error} If leak detection is not set up. Call trackEventListeners() first.
  * @throws {Error} If event listener leaks are detected, with details about each leak.
@@ -314,15 +367,20 @@ type ListenerLeak = {
  * const emitter = new EventEmitter();
  * emitter.on('data', handler);
  * // ... later ...
- * await checkEventListeners({ forceGC: true });
+ * await checkEventListeners({ forceGC: true, format: 'details' });
  * ```
  */
 export async function checkEventListeners(options?: {
   forceGC?: boolean;
   throwOnLeaks?: boolean;
+  format?: 'short' | 'summary' | 'details';
 }): Promise<void> {
-  const { forceGC = global.gc !== undefined, throwOnLeaks = true } =
-    options ?? {};
+  const {
+    forceGC = global.gc !== undefined,
+    throwOnLeaks = true,
+    format = 'summary',
+  } = options ?? {};
+
   if (originalOn === null) {
     throw new Error(
       'Event listener leak detection not set up. Call trackEventListeners() first.',
@@ -331,32 +389,6 @@ export async function checkEventListeners(options?: {
 
   if (forceGC) {
     await forceGarbageCollection();
-  }
-
-  const leaks: ListenerLeak[] = [];
-
-  for (const emitter of allEmitters) {
-    const initialState = emitterInitialState.get(emitter);
-
-    if (initialState === undefined) {
-      continue;
-    }
-
-    const currentEvents = emitter.eventNames();
-
-    for (const eventName of currentEvents) {
-      const expectedCount = initialState[eventName] ?? 0;
-      const actualCount = emitter.listenerCount(eventName);
-
-      if (actualCount > expectedCount) {
-        leaks.push({
-          emitter,
-          eventName,
-          expected: expectedCount,
-          actual: actualCount,
-        });
-      }
-    }
   }
 
   EventEmitter.prototype.on = originalOn;
@@ -371,27 +403,290 @@ export async function checkEventListeners(options?: {
   originalRemoveListener = null;
   originalOff = null;
 
+  let message: string;
+  if (format === 'short') {
+    message = formatShortMessage();
+  } else if (format === 'details') {
+    message = formatDetailsMessage();
+  } else {
+    message = formatSummaryMessage();
+  }
+
   allEmitters.clear();
   emitterInitialState = new WeakMap<EventEmitter<any>, EventCounts>();
   constructorCounts.clear();
+  listenerAdditions = new WeakMap<EventEmitter<any>, ListenerAddition[]>();
 
-  if (leaks.length > 0) {
-    const message =
-      'Event listener leaks detected:\n' +
-      leaks
-        .map(
-          (leak) =>
-            `  Event '${getEmitterId(leak.emitter)}.${String(leak.eventName)}': expected ${
-              leak.expected
-            } listener(s), found ${leak.actual} (+${leak.actual - leak.expected} leaked)`,
-        )
-        .join('\n');
-
+  if (message !== '') {
     if (throwOnLeaks) {
       throw new Error(message);
     }
     console.error(message);
   }
+}
+
+/**
+ * Formats leak message in short format.
+ * Iterates over emitters directly to count leaked listeners.
+ *
+ * @returns Formatted message string, or empty string if no leaks detected.
+ */
+function formatShortMessage(): string {
+  let totalLeaked = 0;
+
+  for (const emitter of allEmitters) {
+    const initialState = emitterInitialState.get(emitter);
+    if (initialState === undefined) {
+      continue;
+    }
+
+    const currentEvents = emitter.eventNames();
+    for (const eventName of currentEvents) {
+      const expectedCount = initialState[eventName] ?? 0;
+      const actualCount = emitter.listenerCount(eventName);
+      if (actualCount > expectedCount) {
+        totalLeaked += actualCount - expectedCount;
+      }
+    }
+  }
+
+  if (totalLeaked === 0) {
+    return '';
+  }
+
+  return `Event listener leaks detected: ${totalLeaked} leaked listener(s)`;
+}
+
+/**
+ * Formats leak message in summary format.
+ * Iterates over emitters directly to format each leak.
+ *
+ * @returns Formatted message string, or empty string if no leaks detected.
+ */
+function formatSummaryMessage(): string {
+  const lines: string[] = [];
+  let hasLeaks = false;
+
+  for (const emitter of allEmitters) {
+    const initialState = emitterInitialState.get(emitter);
+    if (initialState === undefined) {
+      continue;
+    }
+
+    const emitterId = getEmitterId(emitter);
+    const currentEvents = emitter.eventNames();
+
+    for (const eventName of currentEvents) {
+      const expectedCount = initialState[eventName] ?? 0;
+      const actualCount = emitter.listenerCount(eventName);
+
+      if (actualCount > expectedCount) {
+        if (!hasLeaks) {
+          lines.push('Event listener leaks detected:');
+          hasLeaks = true;
+        }
+        lines.push(
+          `  '${emitterId}.${String(eventName)}': expected ${expectedCount} listener(s), found ${actualCount} (+${actualCount - expectedCount} leaked)`,
+        );
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats leak message in details format with stack traces.
+ * Iterates over emitters directly, grouping by emitter and event.
+ *
+ * @returns Formatted message string, or empty string if no leaks detected.
+ */
+function formatDetailsMessage(): string {
+  const lines: string[] = [];
+  let hasLeaks = false;
+
+  // Iterate over all tracked emitters
+  for (const emitter of allEmitters) {
+    const initialState = emitterInitialState.get(emitter);
+    if (initialState === undefined) {
+      continue;
+    }
+
+    const emitterId = getEmitterId(emitter);
+    // All listener additions for this emitter (includes removed ones)
+    const additions = listenerAdditions.get(emitter) ?? [];
+    const eventNames = emitter.eventNames();
+    // Collect leaks for this emitter: events with more listeners than expected
+    const leaks: Array<{
+      eventName: EventName;
+      expected: number;
+      actual: number;
+    }> = [];
+
+    // First pass: identify which events have leaks
+    for (const eventName of eventNames) {
+      const expectedCount = initialState[eventName] ?? 0;
+      const actualCount = emitter.listenerCount(eventName);
+
+      if (actualCount > expectedCount) {
+        leaks.push({
+          eventName,
+          expected: expectedCount,
+          actual: actualCount,
+        });
+      }
+    }
+
+    // If this emitter has leaks, output emitter header and leak details
+    if (leaks.length > 0) {
+      if (!hasLeaks) {
+        lines.push('Event listener leaks detected:');
+        hasLeaks = true;
+      }
+
+      lines.push(`  ${emitterId}`);
+
+      // Second pass: for each leaked event, show which listeners leaked
+      for (const leak of leaks) {
+        const leakedCount = leak.actual - leak.expected;
+        lines.push(
+          `  > '${String(leak.eventName)}': expected ${leak.expected} listener(s), found ${leak.actual} (+${leakedCount} leaked)`,
+        );
+
+        // Filter additions to find only the ones that weren't removed (i.e., leaked)
+        const leakedAdditions = additions.filter(
+          (a) => a.eventName === leak.eventName && !a.removed,
+        );
+        // Output stack trace for each leaked listener addition
+        for (const addition of leakedAdditions) {
+          const formattedAdditionStack = formatStackTrace(addition.stack);
+          if (formattedAdditionStack !== '') {
+            lines.push(
+              `      * ${addition.method}('${String(leak.eventName)}') ${formattedAdditionStack}`,
+            );
+          } else {
+            lines.push(
+              `      * ${addition.method}('${String(leak.eventName)}')`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Captures the full stack trace without filtering.
+ *
+ * @returns The full stack trace string, or empty string if unavailable.
+ */
+function captureStackTrace(): string {
+  const error = new Error();
+  return error.stack ?? '';
+}
+
+/**
+ * Extracts file location from a stack trace line.
+ *
+ * @param line - A single line from a stack trace.
+ * @returns Formatted frame as `path/to/file.ts:line:col`, or null if not parseable.
+ */
+function extractLocationFromLine(line: string): string | null {
+  // Try format with parentheses first (most common)
+  const matchWithParens = line.match(/at .+ \((.+):(\d+):(\d+)\)/);
+  if (matchWithParens !== null) {
+    const file = matchWithParens[1];
+    const lineNum = matchWithParens[2];
+    const col = matchWithParens[3];
+    return `${file}:${lineNum}:${col}`;
+  }
+
+  // Try format without parentheses
+  const matchWithoutParens = line.match(/at (.+):(\d+):(\d+)/);
+  if (matchWithoutParens !== null) {
+    const file = matchWithoutParens[1];
+    const lineNum = matchWithoutParens[2];
+    const col = matchWithoutParens[3];
+    return `${file}:${lineNum}:${col}`;
+  }
+
+  return null;
+}
+
+/**
+ * Checks if a stack trace line should be filtered out.
+ *
+ * @param line - A single line from a stack trace.
+ * @returns True if the line should be skipped.
+ */
+function shouldSkipStackLine(line: string): boolean {
+  // Skip Error message line
+  if (line.trim().startsWith('Error:')) {
+    return true;
+  }
+
+  // Skip empty lines
+  if (line.trim() === '') {
+    return true;
+  }
+
+  // Skip Node.js internal frames
+  if (
+    line.includes('node:') ||
+    line.includes(' internal/') ||
+    line.includes('(node:')
+  ) {
+    return true;
+  }
+
+  // Skip leakspector frames (but allow test files)
+  if (
+    (line.includes('leakspector') || line.includes('event-listeners.ts')) &&
+    !line.includes('.test.')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Formats a stack trace to show only the first relevant user code frame.
+ * Filters out Node.js internal frames and leakspector frames.
+ * Includes node_modules frames if they're the first non-internal frame.
+ *
+ * @param stack - The full stack trace string.
+ * @returns Formatted frame as `path/to/file.ts:line:col`, or empty string if no relevant frame found.
+ */
+function formatStackTrace(stack: string): string {
+  if (stack === '') {
+    return '';
+  }
+
+  const lines = stack.split('\n');
+
+  for (const line of lines) {
+    if (shouldSkipStackLine(line)) {
+      continue;
+    }
+
+    const location = extractLocationFromLine(line);
+    if (location === null) {
+      continue;
+    }
+
+    // Skip if it's still a leakspector internal file
+    const file = location.split(':')[0];
+    if (file.includes('event-listeners.ts') && !file.includes('.test.')) {
+      continue;
+    }
+
+    return location;
+  }
+
+  return '';
 }
 
 /**

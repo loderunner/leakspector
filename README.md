@@ -170,8 +170,8 @@ await check({ format: 'summary' });
 ```typescript
 await check({ format: 'details' });
 // Error: Event listener leaks detected:
-//   EventEmitter#1 path/to/constructor-call.ts:41:4
-//   > Event 'error': expected 0 listener(s), found 2 (+2 leaked)
+//   EventEmitter#1
+//   > 'error': expected 0 listener(s), found 2 (+2 leaked)
 //       * on('error') path/to/event-listening-file.ts:301:4
 //       * once('error') path/to/other/file.ts:22:2
 ```

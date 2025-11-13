@@ -1,5 +1,12 @@
 # leakspector
 
+[![npm version](https://img.shields.io/npm/v/leakspector)](https://www.npmjs.com/package/leakspector)
+[![npm trusted publishing](https://img.shields.io/badge/npm-trusted%20publishing-blue)](https://docs.npmjs.com/about-package-provenance)
+[![License](https://img.shields.io/npm/l/leakspector)](LICENSE)
+[![CI](https://github.com/loderunner/leakspector/actions/workflows/lint-test-build.yml/badge.svg)](https://github.com/loderunner/leakspector/actions/workflows/lint-test-build.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24.9-brightgreen)](https://nodejs.org/)
+
 A Node.js library for detecting memory leaks. Track resources at the start of
 each test and verify they're cleaned up at the end.
 

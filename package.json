@@ -21,7 +21,7 @@
     "lint:fix": "prettier --write . && eslint --fix .",
     "test": "vitest",
     "build": "tsdown",
-    "dev": "tsdown --watch",
+    "watch": "tsdown --watch",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run build"
   },

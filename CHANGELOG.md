@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/loderunner/leakspector/compare/0.0.2...0.0.3) (2025-11-13)
+
+
+### Features
+
+* add configurable output formats for leak detection ([#10](https://github.com/loderunner/leakspector/issues/10)) ([9209448](https://github.com/loderunner/leakspector/commit/92094484a4757430ab9ca2347b786925e643d986))
+
 ## [0.0.2](https://github.com/loderunner/leakspector/compare/0.0.1...0.0.2) (2025-11-11)
 
 

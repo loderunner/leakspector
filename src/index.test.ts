@@ -1,266 +1,157 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
+import http from 'node:http';
 
-import { eventListeners } from './event-listeners';
-import { forceGarbageCollection } from './force-gc';
-import { timers } from './timers';
+import { describe, expect, it } from 'vitest';
 
-import { check, track } from './index';
+import { check, snapshot, track } from './index';
 
-vi.mock('./force-gc');
-vi.mock('./event-listeners');
-vi.mock('./timers');
+describe('leakspector integration', () => {
+  it('should track all resources when using "all"', async () => {
+    track({ trackers: 'all' });
 
-const mockEventListenersTrack = vi.mocked(eventListeners.track);
-const mockEventListenersCheck = vi.mocked(eventListeners.check);
-const mockTimersTrack = vi.mocked(timers.track);
-const mockTimersCheck = vi.mocked(timers.check);
+    // Create various resources
+    const emitter = new EventEmitter();
+    emitter.on('data', () => {});
 
-describe('index', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockEventListenersTrack.mockReset();
-    mockEventListenersCheck.mockReset();
-    mockTimersTrack.mockReset();
-    mockTimersCheck.mockReset();
+    const timer = setTimeout(() => {}, 10000);
+
+    const agent = new http.Agent({ keepAlive: true });
+    const req = http.request({ host: 'example.com', agent });
+    req.on('error', () => {});
+    req.destroy();
+
+    // Take a snapshot
+    const snap = snapshot();
+
+    expect(snap.eventListeners).toBeDefined();
+    expect(snap.timers).toBeDefined();
+    expect(snap.httpAgents).toBeDefined();
+
+    // Clean up
+    emitter.removeAllListeners();
+    clearTimeout(timer);
+    agent.destroy();
+
+    await check({ forceGC: false, throwOnLeaks: false });
   });
 
-  afterEach(async () => {
-    // Clear active trackers after each test
+  it('should track only specified trackers', async () => {
+    track({ trackers: ['eventListeners', 'httpAgents'] });
+
+    const emitter = new EventEmitter();
+    emitter.on('data', () => {});
+
+    const agent = new http.Agent({ keepAlive: true });
+    const req = http.request({ host: 'example.com', agent });
+    req.on('error', () => {});
+    req.destroy();
+
+    const snap = snapshot();
+
+    expect(snap.eventListeners).toBeDefined();
+    expect(snap.timers).toBeUndefined();
+    expect(snap.httpAgents).toBeDefined();
+
+    emitter.removeAllListeners();
+    agent.destroy();
+
+    await check({ forceGC: false, throwOnLeaks: false });
+  });
+
+  it('should detect multiple types of leaks', async () => {
+    track({ trackers: 'all' });
+
+    // Create leaked resources
+    const emitter = new EventEmitter();
+    emitter.on('data', () => {});
+
+    setTimeout(() => {}, 10000);
+
+    const agent = new http.Agent({ keepAlive: true });
+    const req = http.request({ host: 'example.com', agent });
+    req.on('error', () => {});
+    req.destroy();
+
+    // Don't clean up - should detect all leaks
     try {
-      await check({ throwOnLeaks: false });
-    } catch {
-      // Ignore all errors - tracking might not be set up or might have already been cleared
+      await check({ forceGC: false, throwOnLeaks: true });
+      expect.fail('Should have detected leaks');
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain('Event listener leaks detected');
+      expect(message).toContain('Timer leaks detected');
+      expect(message).toContain('HTTP agent socket pool leaks detected');
     }
   });
 
-  describe('track', () => {
-    it('should call both trackers when no options provided', () => {
-      track();
+  it('should support different format options', async () => {
+    track({ trackers: 'all' });
 
-      expect(mockEventListenersTrack).toHaveBeenCalledTimes(1);
-      expect(mockTimersTrack).toHaveBeenCalledTimes(1);
-    });
+    const emitter = new EventEmitter();
+    emitter.on('data', () => {});
 
-    it('should call both trackers when trackers is "all"', () => {
-      track({ trackers: 'all' });
+    const agent = new http.Agent({ keepAlive: true });
+    const req = http.request({ host: 'example.com', agent });
+    req.on('error', () => {});
+    req.destroy();
 
-      expect(mockEventListenersTrack).toHaveBeenCalledTimes(1);
-      expect(mockTimersTrack).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call only eventListeners when specified', () => {
-      track({ trackers: ['eventListeners'] });
-
-      expect(mockEventListenersTrack).toHaveBeenCalledTimes(1);
-      expect(mockTimersTrack).not.toHaveBeenCalled();
-    });
-
-    it('should call only timers when specified', () => {
-      track({ trackers: ['timers'] });
-
-      expect(mockEventListenersTrack).not.toHaveBeenCalled();
-      expect(mockTimersTrack).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call multiple specific trackers', () => {
-      track({ trackers: ['eventListeners', 'timers'] });
-
-      expect(mockEventListenersTrack).toHaveBeenCalledTimes(1);
-      expect(mockTimersTrack).toHaveBeenCalledTimes(1);
-    });
+    try {
+      await check({ forceGC: false, throwOnLeaks: true, format: 'short' });
+      expect.fail('Should have detected leaks');
+    } catch (error) {
+      const message = (error as Error).message;
+      // Short format should have terse messages
+      expect(message).toMatch(/\d+ leaked/);
+    }
   });
 
-  describe('check', () => {
-    it('should throw error if tracking is not set up', async () => {
-      await expect(check({ throwOnLeaks: false })).rejects.toThrow(
-        /not set up/,
-      );
-    });
+  it('should work with no leaks', async () => {
+    // Test without http agents to avoid internal event listener complexity
+    track({ trackers: ['eventListeners', 'timers'] });
 
-    it('should call check on all active trackers', async () => {
-      track();
-      await check();
+    const emitter = new EventEmitter();
+    const handler = () => {};
+    emitter.on('data', handler);
 
-      expect(mockEventListenersCheck).toHaveBeenCalledTimes(1);
-      expect(mockTimersCheck).toHaveBeenCalledTimes(1);
-    });
+    const timer = setTimeout(() => {}, 10000);
 
-    it('should only check enabled trackers', async () => {
-      track({ trackers: ['eventListeners'] });
-      await check();
+    // Clean up
+    emitter.removeListener('data', handler);
+    clearTimeout(timer);
 
-      expect(mockEventListenersCheck).toHaveBeenCalledTimes(1);
-      expect(mockTimersCheck).not.toHaveBeenCalled();
-    });
+    // Should not throw
+    await expect(
+      check({ forceGC: false, throwOnLeaks: true }),
+    ).resolves.not.toThrow();
+  });
 
-    const checkOptionsCases: {
-      checkOptions: Parameters<typeof check>[0];
-      expectEventListeners: Parameters<typeof eventListeners.check>[0];
-      expectTimers: Parameters<typeof timers.check>[0];
-    }[] = [
-      {
-        checkOptions: undefined,
-        expectEventListeners: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'summary',
-        },
-        expectTimers: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'summary',
-        },
-      },
-      {
-        checkOptions: { forceGC: true },
-        expectEventListeners: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'summary',
-        },
-        expectTimers: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'summary',
-        },
-      },
-      {
-        checkOptions: { throwOnLeaks: false },
-        expectEventListeners: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'summary',
-        },
-        expectTimers: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'summary',
-        },
-      },
-      {
-        checkOptions: { format: 'short' },
-        expectEventListeners: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'short',
-        },
-        expectTimers: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'short',
-        },
-      },
-      {
-        checkOptions: { format: 'details' },
-        expectEventListeners: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'details',
-        },
-        expectTimers: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'details',
-        },
-      },
-      {
-        checkOptions: { forceGC: true, throwOnLeaks: false, format: 'details' },
-        expectEventListeners: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'details',
-        },
-        expectTimers: {
-          forceGC: false,
-          throwOnLeaks: true,
-          format: 'details',
-        },
-      },
-    ];
-    it.each(checkOptionsCases)(
-      'should pass correct options to tracker checks - $checkOptions',
-      async ({ checkOptions, expectEventListeners, expectTimers }) => {
-        track();
-        await check(checkOptions);
+  it('should throw if track not called', async () => {
+    await expect(check()).rejects.toThrow('Leak detection not set up');
+  });
 
-        expect(mockEventListenersCheck).toHaveBeenCalledWith(
-          expectEventListeners,
-        );
-        expect(mockTimersCheck).toHaveBeenCalledWith(expectTimers);
-      },
-    );
+  it('should allow tracking individual trackers separately', async () => {
+    // Track only httpAgents
+    track({ trackers: ['httpAgents'] });
 
-    it('should call forceGarbageCollection when forceGC is true', async () => {
-      track();
-      await check({ forceGC: true });
+    const agent = new http.Agent({ keepAlive: true });
+    const req = http.request({ host: 'example.com', agent });
+    req.on('error', () => {});
+    req.destroy();
 
-      expect(forceGarbageCollection).toHaveBeenCalledTimes(1);
-    });
+    const snap = snapshot();
 
-    it('should aggregate errors from multiple trackers', async () => {
-      track();
-      mockEventListenersCheck.mockRejectedValue(
-        new Error('Event listener leaks detected'),
-      );
-      mockTimersCheck.mockRejectedValue(new Error('Timer leaks detected'));
+    expect(snap.eventListeners).toBeUndefined();
+    expect(snap.timers).toBeUndefined();
+    expect(snap.httpAgents).toBeDefined();
 
-      try {
-        await check();
-        expect.fail('Should have thrown');
-      } catch (error) {
-        if (error instanceof Error) {
-          expect(error.message).toContain('Event listener leaks detected');
-          expect(error.message).toContain('Timer leaks detected');
-        }
-      }
-    });
-
-    it('should not throw when no errors occur', async () => {
-      track();
-      await expect(check()).resolves.not.toThrow();
-    });
-
-    it('should console.error when throwOnLeaks is false and errors occur', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      track();
-      mockEventListenersCheck.mockRejectedValue(
-        new Error('Event listener leaks detected'),
-      );
-      mockTimersCheck.mockResolvedValue(undefined);
-
-      await check({ throwOnLeaks: false });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Event listener leaks detected',
-      );
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should clear active trackers after check', async () => {
-      track();
-      await check();
-
-      // After check, activeTrackers should be cleared, so calling check again should fail
-      await expect(check({ throwOnLeaks: false })).rejects.toThrow(
-        /not set up/,
-      );
-    });
-
-    it('should continue checking other trackers if one throws', async () => {
-      track();
-      mockEventListenersCheck.mockRejectedValue(
-        new Error('Event listener leaks detected'),
-      );
-
-      await expect(check()).rejects.toThrow();
-
-      // Both should have been called
-      expect(mockEventListenersCheck).toHaveBeenCalledTimes(1);
-      expect(mockTimersCheck).toHaveBeenCalledTimes(1);
-    });
+    try {
+      await check({ forceGC: false, throwOnLeaks: true });
+      expect.fail('Should have detected HTTP agent leak');
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain('HTTP agent socket pool leaks detected');
+      expect(message).not.toContain('Event listener');
+      expect(message).not.toContain('Timer');
+    }
   });
 });

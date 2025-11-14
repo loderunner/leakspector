@@ -1,3 +1,4 @@
+import { type ChildProcessesSnapshot, childProcesses } from './child-processes';
 import {
   type EmitterStringifier,
   type ListenersSnapshot,
@@ -7,8 +8,9 @@ import {
 } from './event-listeners';
 import { type TimersSnapshot, timers } from './timers';
 
-export { eventListeners, timers };
+export { childProcesses, eventListeners, timers };
 export {
+  type ChildProcessesSnapshot,
   type EmitterStringifier,
   type ListenersSnapshot,
   type TimersSnapshot,
@@ -19,7 +21,7 @@ export {
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'timers' | 'childProcesses';
 
 /**
  * Snapshot of all active trackers' current state.
@@ -27,6 +29,7 @@ export type TrackerName = 'eventListeners' | 'timers';
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
   timers?: TimersSnapshot;
+  childProcesses?: ChildProcessesSnapshot;
 };
 
 const activeTrackers = new Set<TrackerName>();
@@ -53,7 +56,7 @@ const activeTrackers = new Set<TrackerName>();
  * track({ trackers: ["eventListeners"] });
  *
  * // Enable multiple specific trackers
- * track({ trackers: ["eventListeners", "timers"] });
+ * track({ trackers: ["eventListeners", "timers", "childProcesses"] });
  * ```
  */
 export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
@@ -70,6 +73,14 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
   if (trackersToEnable === 'all' || trackersToEnable.includes('timers')) {
     timers.track();
     activeTrackers.add('timers');
+  }
+
+  if (
+    trackersToEnable === 'all' ||
+    trackersToEnable.includes('childProcesses')
+  ) {
+    childProcesses.track();
+    activeTrackers.add('childProcesses');
   }
 }
 
@@ -90,7 +101,8 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
  * const snap = snapshot();
  * // snap = {
  * //   eventListeners: { 'EventEmitter#1': { data: 1 } },
- * //   timers: { setTimeout: 1, setInterval: 0 }
+ * //   timers: { setTimeout: 1, setInterval: 0 },
+ * //   childProcesses: { active: 0, exited: 1, withOpenStreams: 0 }
  * // }
  * ```
  */
@@ -103,6 +115,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('timers')) {
     result.timers = timers.snapshot();
+  }
+
+  if (activeTrackers.has('childProcesses')) {
+    result.childProcesses = childProcesses.snapshot();
   }
 
   return result;
@@ -161,6 +177,9 @@ export async function check(options?: {
           break;
         case 'timers':
           await timers.check(checkOptions);
+          break;
+        case 'childProcesses':
+          await childProcesses.check(checkOptions);
           break;
       }
     } catch (error) {

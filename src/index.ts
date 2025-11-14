@@ -5,21 +5,31 @@ import {
   eventListeners,
   registerEmitterStringifier,
 } from './event-listeners';
+import {
+  type PoolAdapter,
+  clearPoolAdapters,
+  registerPoolAdapter,
+} from './pool-adapter';
+import { type PoolsSnapshot, pools } from './pools';
 import { type TimersSnapshot, timers } from './timers';
 
-export { eventListeners, timers };
+export { eventListeners, pools, timers };
 export {
   type EmitterStringifier,
   type ListenersSnapshot,
+  type PoolAdapter,
+  type PoolsSnapshot,
   type TimersSnapshot,
   clearEmitterStringifiers,
+  clearPoolAdapters,
   registerEmitterStringifier,
+  registerPoolAdapter,
 };
 
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'timers' | 'pools';
 
 /**
  * Snapshot of all active trackers' current state.
@@ -27,6 +37,7 @@ export type TrackerName = 'eventListeners' | 'timers';
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
   timers?: TimersSnapshot;
+  pools?: PoolsSnapshot;
 };
 
 const activeTrackers = new Set<TrackerName>();
@@ -71,6 +82,11 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     timers.track();
     activeTrackers.add('timers');
   }
+
+  if (trackersToEnable === 'all' || trackersToEnable.includes('pools')) {
+    pools.track();
+    activeTrackers.add('pools');
+  }
 }
 
 /**
@@ -103,6 +119,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('timers')) {
     result.timers = timers.snapshot();
+  }
+
+  if (activeTrackers.has('pools')) {
+    result.pools = pools.snapshot();
   }
 
   return result;
@@ -161,6 +181,9 @@ export async function check(options?: {
           break;
         case 'timers':
           await timers.check(checkOptions);
+          break;
+        case 'pools':
+          await pools.check(checkOptions);
           break;
       }
     } catch (error) {

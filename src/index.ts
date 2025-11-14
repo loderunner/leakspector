@@ -6,20 +6,31 @@ import {
   registerEmitterStringifier,
 } from './event-listeners';
 import { type TimersSnapshot, timers } from './timers';
+import {
+  type WorkerThreadsSnapshot,
+  TrackedWorker,
+  TrackedSharedArrayBuffer,
+  workerThreads,
+  setWorkerIdleThreshold,
+} from './worker-threads';
 
-export { eventListeners, timers };
+export { eventListeners, timers, workerThreads };
 export {
   type EmitterStringifier,
   type ListenersSnapshot,
   type TimersSnapshot,
+  type WorkerThreadsSnapshot,
+  TrackedWorker,
+  TrackedSharedArrayBuffer,
   clearEmitterStringifiers,
   registerEmitterStringifier,
+  setWorkerIdleThreshold,
 };
 
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'timers' | 'workerThreads';
 
 /**
  * Snapshot of all active trackers' current state.
@@ -27,6 +38,7 @@ export type TrackerName = 'eventListeners' | 'timers';
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
   timers?: TimersSnapshot;
+  workerThreads?: WorkerThreadsSnapshot;
 };
 
 const activeTrackers = new Set<TrackerName>();
@@ -53,7 +65,7 @@ const activeTrackers = new Set<TrackerName>();
  * track({ trackers: ["eventListeners"] });
  *
  * // Enable multiple specific trackers
- * track({ trackers: ["eventListeners", "timers"] });
+ * track({ trackers: ["eventListeners", "timers", "workerThreads"] });
  * ```
  */
 export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
@@ -71,6 +83,14 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     timers.track();
     activeTrackers.add('timers');
   }
+
+  if (
+    trackersToEnable === 'all' ||
+    trackersToEnable.includes('workerThreads')
+  ) {
+    workerThreads.track();
+    activeTrackers.add('workerThreads');
+  }
 }
 
 /**
@@ -86,11 +106,13 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
  * const emitter = new EventEmitter();
  * emitter.on('data', handler);
  * setTimeout(() => {}, 1000);
+ * const worker = new Worker('./worker.js');
  *
  * const snap = snapshot();
  * // snap = {
  * //   eventListeners: { 'EventEmitter#1': { data: 1 } },
- * //   timers: { setTimeout: 1, setInterval: 0 }
+ * //   timers: { setTimeout: 1, setInterval: 0 },
+ * //   workerThreads: { workers: { total: 1, alive: 1, idle: 0, terminated: 0 }, ... }
  * // }
  * ```
  */
@@ -103,6 +125,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('timers')) {
     result.timers = timers.snapshot();
+  }
+
+  if (activeTrackers.has('workerThreads')) {
+    result.workerThreads = workerThreads.snapshot();
   }
 
   return result;
@@ -161,6 +187,9 @@ export async function check(options?: {
           break;
         case 'timers':
           await timers.check(checkOptions);
+          break;
+        case 'workerThreads':
+          await workerThreads.check(checkOptions);
           break;
       }
     } catch (error) {

@@ -5,10 +5,10 @@ verify they're cleaned up properly.
 
 ## Overview
 
-leakspector helps you catch memory leaks in your code by tracking resource
-usage and comparing it against the initial state. While commonly used within
-test runners to detect leaks in code under test, it can also be used outside
-of tests. Currently tracks:
+leakspector helps you catch memory leaks in your code by tracking resource usage
+and comparing it against the initial state. While commonly used within test
+runners to detect leaks in code under test, it can also be used outside of
+tests. Currently tracks:
 
 - **Event listeners** on `EventEmitter` instances
 - **Timers** (`setTimeout` and `setInterval`)
@@ -27,8 +27,8 @@ bun add --dev leakspector
 
 ## Usage
 
-Leakspector is commonly used within test runners like Vitest to detect leaks
-in the code being tested, but can also be used outside of tests.
+Leakspector is commonly used within test runners like Vitest to detect leaks in
+the code being tested, but can also be used outside of tests.
 
 ### Basic Setup with Vitest
 
@@ -164,7 +164,8 @@ track({ trackers: ['eventListeners', 'timers'] });
 ### `check(options?)`
 
 Checks for leaks by comparing current resource usage against the initial state.
-When used in tests, call this in `afterEach` to verify resources were cleaned up.
+When used in tests, call this in `afterEach` to verify resources were cleaned
+up.
 
 **Parameters:**
 

@@ -115,12 +115,13 @@ export default {
 
 If using Jest, configure your `test` script in `package.json`:
 
-````json
+```json
 {
   "scripts": {
     "test": "NODE_OPTIONS='--expose-gc' jest"
   }
 }
+```
 
 ### Suppress Errors (Debug Mode)
 
@@ -372,4 +373,7 @@ functions are restored after `check()` is called.
 ## License
 
 Apache-2.0
-````
+
+```
+
+```

@@ -2,16 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { eventListeners } from './event-listeners';
 import { forceGarbageCollection } from './force-gc';
+import { httpAgents } from './http-agents';
 import { timers } from './timers';
 
 import { check, track } from './index';
 
 vi.mock('./force-gc');
 vi.mock('./event-listeners');
+vi.mock('./http-agents');
 vi.mock('./timers');
 
 const mockEventListenersTrack = vi.mocked(eventListeners.track);
 const mockEventListenersCheck = vi.mocked(eventListeners.check);
+const mockHttpAgentsTrack = vi.mocked(httpAgents.track);
+const mockHttpAgentsCheck = vi.mocked(httpAgents.check);
 const mockTimersTrack = vi.mocked(timers.track);
 const mockTimersCheck = vi.mocked(timers.check);
 
@@ -20,6 +24,8 @@ describe('index', () => {
     vi.clearAllMocks();
     mockEventListenersTrack.mockReset();
     mockEventListenersCheck.mockReset();
+    mockHttpAgentsTrack.mockReset();
+    mockHttpAgentsCheck.mockReset();
     mockTimersTrack.mockReset();
     mockTimersCheck.mockReset();
   });
@@ -34,17 +40,19 @@ describe('index', () => {
   });
 
   describe('track', () => {
-    it('should call both trackers when no options provided', () => {
+    it('should call all trackers when no options provided', () => {
       track();
 
       expect(mockEventListenersTrack).toHaveBeenCalledTimes(1);
+      expect(mockHttpAgentsTrack).toHaveBeenCalledTimes(1);
       expect(mockTimersTrack).toHaveBeenCalledTimes(1);
     });
 
-    it('should call both trackers when trackers is "all"', () => {
+    it('should call all trackers when trackers is "all"', () => {
       track({ trackers: 'all' });
 
       expect(mockEventListenersTrack).toHaveBeenCalledTimes(1);
+      expect(mockHttpAgentsTrack).toHaveBeenCalledTimes(1);
       expect(mockTimersTrack).toHaveBeenCalledTimes(1);
     });
 
@@ -82,6 +90,7 @@ describe('index', () => {
       await check();
 
       expect(mockEventListenersCheck).toHaveBeenCalledTimes(1);
+      expect(mockHttpAgentsCheck).toHaveBeenCalledTimes(1);
       expect(mockTimersCheck).toHaveBeenCalledTimes(1);
     });
 
@@ -96,11 +105,17 @@ describe('index', () => {
     const checkOptionsCases: {
       checkOptions: Parameters<typeof check>[0];
       expectEventListeners: Parameters<typeof eventListeners.check>[0];
+      expectHttpAgents: Parameters<typeof httpAgents.check>[0];
       expectTimers: Parameters<typeof timers.check>[0];
     }[] = [
       {
         checkOptions: undefined,
         expectEventListeners: {
+          forceGC: false,
+          throwOnLeaks: true,
+          format: 'summary',
+        },
+        expectHttpAgents: {
           forceGC: false,
           throwOnLeaks: true,
           format: 'summary',
@@ -118,6 +133,11 @@ describe('index', () => {
           throwOnLeaks: true,
           format: 'summary',
         },
+        expectHttpAgents: {
+          forceGC: false,
+          throwOnLeaks: true,
+          format: 'summary',
+        },
         expectTimers: {
           forceGC: false,
           throwOnLeaks: true,
@@ -127,6 +147,11 @@ describe('index', () => {
       {
         checkOptions: { throwOnLeaks: false },
         expectEventListeners: {
+          forceGC: false,
+          throwOnLeaks: true,
+          format: 'summary',
+        },
+        expectHttpAgents: {
           forceGC: false,
           throwOnLeaks: true,
           format: 'summary',
@@ -144,6 +169,11 @@ describe('index', () => {
           throwOnLeaks: true,
           format: 'short',
         },
+        expectHttpAgents: {
+          forceGC: false,
+          throwOnLeaks: true,
+          format: 'short',
+        },
         expectTimers: {
           forceGC: false,
           throwOnLeaks: true,
@@ -153,6 +183,11 @@ describe('index', () => {
       {
         checkOptions: { format: 'details' },
         expectEventListeners: {
+          forceGC: false,
+          throwOnLeaks: true,
+          format: 'details',
+        },
+        expectHttpAgents: {
           forceGC: false,
           throwOnLeaks: true,
           format: 'details',
@@ -170,6 +205,11 @@ describe('index', () => {
           throwOnLeaks: true,
           format: 'details',
         },
+        expectHttpAgents: {
+          forceGC: false,
+          throwOnLeaks: true,
+          format: 'details',
+        },
         expectTimers: {
           forceGC: false,
           throwOnLeaks: true,
@@ -179,13 +219,19 @@ describe('index', () => {
     ];
     it.each(checkOptionsCases)(
       'should pass correct options to tracker checks - $checkOptions',
-      async ({ checkOptions, expectEventListeners, expectTimers }) => {
+      async ({
+        checkOptions,
+        expectEventListeners,
+        expectHttpAgents,
+        expectTimers,
+      }) => {
         track();
         await check(checkOptions);
 
         expect(mockEventListenersCheck).toHaveBeenCalledWith(
           expectEventListeners,
         );
+        expect(mockHttpAgentsCheck).toHaveBeenCalledWith(expectHttpAgents);
         expect(mockTimersCheck).toHaveBeenCalledWith(expectTimers);
       },
     );
@@ -202,6 +248,9 @@ describe('index', () => {
       mockEventListenersCheck.mockRejectedValue(
         new Error('Event listener leaks detected'),
       );
+      mockHttpAgentsCheck.mockRejectedValue(
+        new Error('HTTP agent socket pool leaks detected'),
+      );
       mockTimersCheck.mockRejectedValue(new Error('Timer leaks detected'));
 
       try {
@@ -210,6 +259,7 @@ describe('index', () => {
       } catch (error) {
         if (error instanceof Error) {
           expect(error.message).toContain('Event listener leaks detected');
+          expect(error.message).toContain('HTTP agent socket pool leaks detected');
           expect(error.message).toContain('Timer leaks detected');
         }
       }
@@ -258,8 +308,9 @@ describe('index', () => {
 
       await expect(check()).rejects.toThrow();
 
-      // Both should have been called
+      // All should have been called
       expect(mockEventListenersCheck).toHaveBeenCalledTimes(1);
+      expect(mockHttpAgentsCheck).toHaveBeenCalledTimes(1);
       expect(mockTimersCheck).toHaveBeenCalledTimes(1);
     });
   });

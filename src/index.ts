@@ -5,11 +5,16 @@ import {
   eventListeners,
   registerEmitterStringifier,
 } from './event-listeners';
+import {
+  type HttpAgentsSnapshot,
+  httpAgents,
+} from './http-agents';
 import { type TimersSnapshot, timers } from './timers';
 
-export { eventListeners, timers };
+export { eventListeners, httpAgents, timers };
 export {
   type EmitterStringifier,
+  type HttpAgentsSnapshot,
   type ListenersSnapshot,
   type TimersSnapshot,
   clearEmitterStringifiers,
@@ -19,13 +24,14 @@ export {
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'httpAgents' | 'timers';
 
 /**
  * Snapshot of all active trackers' current state.
  */
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
+  httpAgents?: HttpAgentsSnapshot;
   timers?: TimersSnapshot;
 };
 
@@ -67,6 +73,11 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     activeTrackers.add('eventListeners');
   }
 
+  if (trackersToEnable === 'all' || trackersToEnable.includes('httpAgents')) {
+    httpAgents.track();
+    activeTrackers.add('httpAgents');
+  }
+
   if (trackersToEnable === 'all' || trackersToEnable.includes('timers')) {
     timers.track();
     activeTrackers.add('timers');
@@ -99,6 +110,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('eventListeners')) {
     result.eventListeners = eventListeners.snapshot();
+  }
+
+  if (activeTrackers.has('httpAgents')) {
+    result.httpAgents = httpAgents.snapshot();
   }
 
   if (activeTrackers.has('timers')) {
@@ -158,6 +173,9 @@ export async function check(options?: {
       switch (trackerName) {
         case 'eventListeners':
           await eventListeners.check(checkOptions);
+          break;
+        case 'httpAgents':
+          await httpAgents.check(checkOptions);
           break;
         case 'timers':
           await timers.check(checkOptions);

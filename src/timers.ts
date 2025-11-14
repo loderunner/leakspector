@@ -70,6 +70,24 @@ export function trackTimers(): void {
     return Number(timer);
   }
 
+  /**
+   * Marks a timer as cleared in the tracking map.
+   *
+   * @param timer - The timer to mark as cleared.
+   * @param filterType - Optional timer type filter. If provided, only timers of this type will be marked as cleared.
+   */
+  function markTimerAsCleared(
+    timer: NodeJS.Timeout | string | number | undefined,
+  ): void {
+    const numericId = timerToNumericId(timer);
+    if (numericId !== undefined) {
+      const timerInfo = trackedTimers.get(numericId);
+      if (timerInfo !== undefined) {
+        timerInfo.cleared = true;
+      }
+    }
+  }
+
   // Define patched setTimeout with explicit overload signatures
   function patchedSetTimeout<TArgs extends any[]>(
     this: void,
@@ -91,12 +109,17 @@ export function trackTimers(): void {
     // Wrap callback to preserve `this` binding that Node.js provides.
     // Node.js binds the timer object as `this` when calling the callback.
     // Our wrapper captures that `this` and passes it to the original callback.
+    // When setTimeout callback fires, mark it as cleared since it's no longer pending.
     const wrappedCallback =
       args.length === 0 && callback.length === 1
         ? function (this: NodeJS.Timeout, _: void): void {
+            // Mark timer as cleared when callback fires
+            markTimerAsCleared(this);
             (callback as (_: void) => void).call(this, _);
           }
         : function (this: NodeJS.Timeout, ...callbackArgs: TArgs): void {
+            // Mark timer as cleared when callback fires
+            markTimerAsCleared(this);
             (callback as (...args: TArgs) => void).call(this, ...callbackArgs);
           };
 
@@ -187,13 +210,7 @@ export function trackTimers(): void {
     this: void,
     timeout: NodeJS.Timeout | string | number | undefined,
   ): void {
-    const numericId = timerToNumericId(timeout);
-    if (numericId !== undefined) {
-      const timerInfo = trackedTimers.get(numericId);
-      if (timerInfo !== undefined) {
-        timerInfo.cleared = true;
-      }
-    }
+    markTimerAsCleared(timeout);
     return originalClearTimeout!.call(this, timeout);
   };
 
@@ -201,13 +218,7 @@ export function trackTimers(): void {
     this: void,
     timeout: NodeJS.Timeout | string | number | undefined,
   ): void {
-    const numericId = timerToNumericId(timeout);
-    if (numericId !== undefined) {
-      const timerInfo = trackedTimers.get(numericId);
-      if (timerInfo !== undefined) {
-        timerInfo.cleared = true;
-      }
-    }
+    markTimerAsCleared(timeout);
     return originalClearInterval!.call(this, timeout);
   };
 }

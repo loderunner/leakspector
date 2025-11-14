@@ -367,6 +367,51 @@ describe('timers', () => {
     });
   });
 
+  describe('setTimeout callback execution', () => {
+    it('should mark setTimeout as cleared when callback fires', async () => {
+      trackTimers();
+      await new Promise<void>((resolve) => {
+        setTimeout(() => {
+          // After callback fires, timer should be marked as cleared
+          const snapshot = snapshotTimers();
+          expect(snapshot.setTimeout).toBe(0);
+          expect(snapshot.setInterval).toBe(0);
+          resolve();
+        }, 10);
+      });
+    });
+
+    it('should not report setTimeout as leak after callback fires', async () => {
+      trackTimers();
+      await new Promise<void>((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, 10);
+      });
+
+      await expect(checkTimers()).resolves.not.toThrow();
+    });
+
+    it('should still track setTimeout before callback fires', async () => {
+      trackTimers();
+      setTimeout(() => {}, 100);
+
+      // Wait an initial delay to ensure the timer is tracked
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Before callback fires, timer should still be tracked
+      const snapshot = snapshotTimers();
+      expect(snapshot.setTimeout).toBe(1);
+
+      // Wait for callback to fire
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // After callback fires, timer should be cleared
+      const snapshotAfter = snapshotTimers();
+      expect(snapshotAfter.setTimeout).toBe(0);
+    });
+  });
+
   describe('numeric ID handling', () => {
     it('should track timer using numeric ID from Timeout object', () => {
       trackTimers();

@@ -44,6 +44,7 @@ function shouldSkipStackLine(line: string): boolean {
   if (
     (line.includes('leakspector') ||
       line.includes('event-listeners.ts') ||
+      line.includes('promises.ts') ||
       line.includes('timers.ts')) &&
     !line.includes('.test.')
   ) {
@@ -86,6 +87,7 @@ export function formatStackTrace(
     const file = location.split(':')[0];
     const shouldSkip =
       (file.includes('event-listeners.ts') ||
+        file.includes('promises.ts') ||
         file.includes('timers.ts') ||
         file.includes('stack-trace-utils.ts')) &&
       !file.includes('.test.');

@@ -1,19 +1,19 @@
 import {
   type EmitterStringifier,
+  type ListenersSnapshot,
   clearEmitterStringifiers,
   eventListeners,
-  type ListenersSnapshot,
   registerEmitterStringifier,
 } from './event-listeners';
-import { timers, type TimersSnapshot } from './timers';
+import { type TimersSnapshot, timers } from './timers';
 
 export { eventListeners, timers };
 export {
   type EmitterStringifier,
-  clearEmitterStringifiers,
   type ListenersSnapshot,
-  registerEmitterStringifier,
   type TimersSnapshot,
+  clearEmitterStringifiers,
+  registerEmitterStringifier,
 };
 
 /**

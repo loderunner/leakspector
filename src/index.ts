@@ -5,11 +5,13 @@ import {
   eventListeners,
   registerEmitterStringifier,
 } from './event-listeners';
+import { type FileHandlesSnapshot, fileHandles } from './file-handles';
 import { type TimersSnapshot, timers } from './timers';
 
-export { eventListeners, timers };
+export { eventListeners, fileHandles, timers };
 export {
   type EmitterStringifier,
+  type FileHandlesSnapshot,
   type ListenersSnapshot,
   type TimersSnapshot,
   clearEmitterStringifiers,
@@ -19,13 +21,14 @@ export {
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'fileHandles' | 'timers';
 
 /**
  * Snapshot of all active trackers' current state.
  */
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
+  fileHandles?: FileHandlesSnapshot;
   timers?: TimersSnapshot;
 };
 
@@ -67,6 +70,11 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     activeTrackers.add('eventListeners');
   }
 
+  if (trackersToEnable === 'all' || trackersToEnable.includes('fileHandles')) {
+    fileHandles.track();
+    activeTrackers.add('fileHandles');
+  }
+
   if (trackersToEnable === 'all' || trackersToEnable.includes('timers')) {
     timers.track();
     activeTrackers.add('timers');
@@ -86,10 +94,12 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
  * const emitter = new EventEmitter();
  * emitter.on('data', handler);
  * setTimeout(() => {}, 1000);
+ * const fd = fs.openSync('file.txt', 'r');
  *
  * const snap = snapshot();
  * // snap = {
  * //   eventListeners: { 'EventEmitter#1': { data: 1 } },
+ * //   fileHandles: { open: 1, readStream: 0, writeStream: 0, promiseHandle: 0, watch: 0, watchFile: 0, total: 1 },
  * //   timers: { setTimeout: 1, setInterval: 0 }
  * // }
  * ```
@@ -99,6 +109,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('eventListeners')) {
     result.eventListeners = eventListeners.snapshot();
+  }
+
+  if (activeTrackers.has('fileHandles')) {
+    result.fileHandles = fileHandles.snapshot();
   }
 
   if (activeTrackers.has('timers')) {
@@ -158,6 +172,9 @@ export async function check(options?: {
       switch (trackerName) {
         case 'eventListeners':
           await eventListeners.check(checkOptions);
+          break;
+        case 'fileHandles':
+          await fileHandles.check(checkOptions);
           break;
         case 'timers':
           await timers.check(checkOptions);

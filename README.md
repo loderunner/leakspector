@@ -27,8 +27,8 @@ bun add --dev leakspector
 
 ## Usage
 
-Leakspector is commonly used within test runners like Vitest to detect leaks in
-the code being tested, but can also be used outside of tests.
+Leakspector is best used in conjunction with a test runner like
+[Vitest](https://vitest.dev/) or [Jest](https://jestjs.io/).
 
 ### Basic Setup with Vitest
 
@@ -58,7 +58,7 @@ describe('my feature', () => {
 
     emitter.on('data', handler);
     emitter.off('data', handler); // Properly cleaned up
-    // Test passes - no leaks detected in the code under test
+    // Test passes - no leaks detected
   });
 
   it('should fail if listeners leak', () => {
@@ -66,18 +66,18 @@ describe('my feature', () => {
     const handler = () => {};
 
     emitter.on('data', handler);
-    // Forgot to remove handler - leak detected in code under test, test fails in afterEach
+    // Forgot to remove handler - leak detected, test fails in afterEach
   });
 
   it('should clean up timers', () => {
     const id = setTimeout(() => {}, 1000);
     clearTimeout(id); // Properly cleaned up
-    // Test passes - no leaks detected in the code under test
+    // Test passes - no leaks detected
   });
 
   it('should fail if timers leak', () => {
     setTimeout(() => {}, 1000);
-    // Forgot to clear timer - leak detected in code under test, test fails in afterEach
+    // Forgot to clear timer - leak detected, test fails in afterEach
   });
 });
 ```
@@ -112,6 +112,15 @@ export default {
   },
 };
 ```
+
+If using Jest, configure your `test` script in `package.json`:
+
+````json
+{
+  "scripts": {
+    "test": "NODE_OPTIONS='--expose-gc' jest"
+  }
+}
 
 ### Suppress Errors (Debug Mode)
 
@@ -363,3 +372,4 @@ functions are restored after `check()` is called.
 ## License
 
 Apache-2.0
+````

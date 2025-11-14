@@ -1,6 +1,7 @@
 {
   "packages": {
     ".": {
+      "pull-request-title-pattern": "chore: release ${version}",
       "changelog-path": "CHANGELOG.md",
       "release-type": "node",
       "bump-minor-pre-major": true,

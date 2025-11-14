@@ -15,6 +15,7 @@ verify they're cleaned up properly.
 - [Usage](#usage)
   - [Basic Setup with Vitest](#basic-setup-with-vitest)
   - [Example Test](#example-test)
+  - [Taking Snapshots](#taking-snapshots)
   - [With Garbage Collection](#with-garbage-collection)
   - [Suppress Errors (Debug Mode)](#suppress-errors-debug-mode)
 - [What Gets Tracked](#what-gets-tracked)
@@ -23,6 +24,9 @@ verify they're cleaned up properly.
 - [API](#api)
   - [`track(options?)`](#trackoptions)
   - [`check(options?)`](#checkoptions)
+  - [`snapshot()`](#snapshot)
+  - [`eventListeners`](#eventlisteners)
+  - [`timers`](#timers-1)
 - [License](#license)
 
 ## Overview

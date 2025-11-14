@@ -6,7 +6,7 @@ import { ClientRequest, IncomingMessage, ServerResponse } from 'node:http';
 import { Server, Socket } from 'node:net';
 
 import { forceGarbageCollection } from './force-gc';
-import { captureStackTrace, formatStackTrace } from './stack-trace-utils';
+import { captureStackTrace, formatStackTrace } from './stack-trace';
 
 type EventName = string | symbol;
 type EventCounts = Record<EventName, number>;

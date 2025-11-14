@@ -1,5 +1,5 @@
 import { forceGarbageCollection } from './force-gc';
-import { captureStackTrace, formatStackTrace } from './stack-trace-utils';
+import { captureStackTrace, formatStackTrace } from './stack-trace';
 
 type TimerType = 'setTimeout' | 'setInterval';
 

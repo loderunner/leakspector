@@ -10,7 +10,7 @@ import { captureStackTrace, formatStackTrace } from './stack-trace';
 
 type EventName = string | symbol;
 type EventCounts = Record<EventName, number>;
-type ListenersSnapshot = Record<string, EventCounts>;
+export type ListenersSnapshot = Record<string, EventCounts>;
 
 type ListenerAddition = {
   eventName: EventName;

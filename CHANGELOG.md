@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/loderunner/leakspector/compare/0.1.0...0.1.1) (2025-11-14)
+
+
+### Bug Fixes
+
+* fix README formatting ([da4e5fb](https://github.com/loderunner/leakspector/commit/da4e5fb3b26f460fc0a448a003e066611201de8a))
+
 ## [0.1.0](https://github.com/loderunner/leakspector/compare/0.0.3...0.1.0) (2025-11-14)
 
 

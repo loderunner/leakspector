@@ -104,6 +104,23 @@ describe('my feature', () => {
 });
 ```
 
+### Taking Snapshots
+
+Take snapshots of current resource state:
+
+```typescript
+import { track, snapshot } from 'leakspector';
+
+track();
+// ... create some resources ...
+
+const snap = snapshot();
+// snap = {
+//   eventListeners: { 'EventEmitter#1': { data: 1 } },
+//   timers: { setTimeout: 2, setInterval: 0 }
+// }
+```
+
 ### With Garbage Collection
 
 For more accurate leak detection, force garbage collection before checking:
@@ -395,6 +412,93 @@ await check({ format: 'details' });
 // Timer leaks detected:
 //   setTimeout path/to/file.ts:42:5
 //   setInterval path/to/file.ts:88:12
+```
+
+### `snapshot()`
+
+Creates a snapshot of all currently active trackers' state. Returns a record mapping
+tracker names to their snapshots. Only includes trackers that are currently active
+(i.e., have been started via `track()`).
+
+**Returns:** `Snapshot` - A record of active tracker names to their snapshots.
+
+The return type structure:
+
+```typescript
+type Snapshot = {
+  eventListeners?: ListenersSnapshot;
+  timers?: TimersSnapshot;
+};
+```
+
+- `eventListeners`: A record mapping emitter identifiers to their event listener counts
+- `timers`: A record mapping timer types to their counts
+
+**Example:**
+
+```typescript
+track();
+const emitter = new EventEmitter();
+emitter.on('data', handler);
+setTimeout(() => {}, 1000);
+
+const snap = snapshot();
+// snap = {
+//   eventListeners: { 'EventEmitter#1': { data: 1 } },
+//   timers: { setTimeout: 1, setInterval: 0 }
+// }
+```
+
+### `eventListeners`
+
+Convenience object providing access to event listener leak detection functions.
+
+**Properties:**
+
+- `track()` - Starts tracking event listeners on all EventEmitter instances.
+- `snapshot()` - Creates a snapshot of current listeners. Returns a `ListenersSnapshot`
+  mapping emitter identifiers to their event listener counts.
+- `check(options?)` - Checks for leaks and restores original EventEmitter prototype
+  methods.
+
+**Example:**
+
+```typescript
+import { eventListeners } from 'leakspector';
+
+eventListeners.track();
+const emitter = new EventEmitter();
+emitter.on('data', handler);
+
+const snap = eventListeners.snapshot();
+// snap = { 'EventEmitter#1': { data: 1 } }
+
+await eventListeners.check();
+```
+
+### `timers`
+
+Convenience object providing access to timer leak detection functions.
+
+**Properties:**
+
+- `track()` - Starts tracking `setTimeout` and `setInterval` calls.
+- `snapshot()` - Creates a snapshot of current timers. Returns a `TimersSnapshot`
+  mapping timer types to their counts.
+- `check(options?)` - Checks for leaks and restores original timer functions.
+
+**Example:**
+
+```typescript
+import { timers } from 'leakspector';
+
+timers.track();
+setTimeout(() => {}, 1000);
+
+const snap = timers.snapshot();
+// snap = { setTimeout: 1, setInterval: 0 }
+
+await timers.check();
 ```
 
 ## License

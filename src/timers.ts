@@ -91,12 +91,29 @@ export function trackTimers(): void {
     // Wrap callback to preserve `this` binding that Node.js provides.
     // Node.js binds the timer object as `this` when calling the callback.
     // Our wrapper captures that `this` and passes it to the original callback.
+    // When setTimeout callback fires, mark it as cleared since it's no longer pending.
     const wrappedCallback =
       args.length === 0 && callback.length === 1
         ? function (this: NodeJS.Timeout, _: void): void {
+            // Mark timer as cleared when callback fires
+            const numericId = timerToNumericId(this);
+            if (numericId !== undefined) {
+              const timerInfo = trackedTimers.get(numericId);
+              if (timerInfo !== undefined && timerInfo.type === 'setTimeout') {
+                timerInfo.cleared = true;
+              }
+            }
             (callback as (_: void) => void).call(this, _);
           }
         : function (this: NodeJS.Timeout, ...callbackArgs: TArgs): void {
+            // Mark timer as cleared when callback fires
+            const numericId = timerToNumericId(this);
+            if (numericId !== undefined) {
+              const timerInfo = trackedTimers.get(numericId);
+              if (timerInfo !== undefined && timerInfo.type === 'setTimeout') {
+                timerInfo.cleared = true;
+              }
+            }
             (callback as (...args: TArgs) => void).call(this, ...callbackArgs);
           };
 

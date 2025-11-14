@@ -2,21 +2,32 @@ import {
   type EmitterStringifier,
   clearEmitterStringifiers,
   eventListeners,
+  type ListenersSnapshot,
   registerEmitterStringifier,
 } from './event-listeners';
-import { timers } from './timers';
+import { timers, type TimersSnapshot } from './timers';
 
 export { eventListeners, timers };
 export {
   type EmitterStringifier,
   clearEmitterStringifiers,
+  type ListenersSnapshot,
   registerEmitterStringifier,
+  type TimersSnapshot,
 };
 
 /**
  * Type representing available leak tracker names.
  */
 export type TrackerName = 'eventListeners' | 'timers';
+
+/**
+ * Snapshot of all active trackers' current state.
+ */
+export type Snapshot = {
+  eventListeners?: ListenersSnapshot;
+  timers?: TimersSnapshot;
+};
 
 const activeTrackers = new Set<TrackerName>();
 
@@ -60,6 +71,41 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     timers.track();
     activeTrackers.add('timers');
   }
+}
+
+/**
+ * Creates a snapshot of all currently active trackers' state.
+ * Returns a record mapping tracker names to their snapshots.
+ * Only includes trackers that are currently active (i.e., have been started via track()).
+ *
+ * @returns A record of active tracker names to their snapshots.
+ *
+ * @example
+ * ```typescript
+ * track();
+ * const emitter = new EventEmitter();
+ * emitter.on('data', handler);
+ * setTimeout(() => {}, 1000);
+ *
+ * const snap = snapshot();
+ * // snap = {
+ * //   eventListeners: { 'EventEmitter#1': { data: 1 } },
+ * //   timers: { setTimeout: 1, setInterval: 0 }
+ * // }
+ * ```
+ */
+export function snapshot(): Snapshot {
+  const result: Snapshot = {};
+
+  if (activeTrackers.has('eventListeners')) {
+    result.eventListeners = eventListeners.snapshot();
+  }
+
+  if (activeTrackers.has('timers')) {
+    result.timers = timers.snapshot();
+  }
+
+  return result;
 }
 
 /**
@@ -139,5 +185,6 @@ export async function check(options?: {
 
 export const leakSpector = {
   track,
+  snapshot,
   check,
 };

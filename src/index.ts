@@ -1,4 +1,13 @@
 import {
+  type DatabasePoolsSnapshot,
+  type PoolAdapter,
+  clearPoolAdapters,
+  databasePools,
+  registerPoolAdapter,
+} from './database-pools';
+import { mysql2Adapter } from './database-pools-mysql2';
+import { pgAdapter } from './database-pools-pg';
+import {
   type EmitterStringifier,
   type ListenersSnapshot,
   clearEmitterStringifiers,
@@ -7,19 +16,25 @@ import {
 } from './event-listeners';
 import { type TimersSnapshot, timers } from './timers';
 
-export { eventListeners, timers };
+export { databasePools, eventListeners, timers };
 export {
+  type DatabasePoolsSnapshot,
   type EmitterStringifier,
   type ListenersSnapshot,
+  type PoolAdapter,
   type TimersSnapshot,
   clearEmitterStringifiers,
+  clearPoolAdapters,
+  mysql2Adapter,
+  pgAdapter,
   registerEmitterStringifier,
+  registerPoolAdapter,
 };
 
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'timers' | 'databasePools';
 
 /**
  * Snapshot of all active trackers' current state.
@@ -27,6 +42,7 @@ export type TrackerName = 'eventListeners' | 'timers';
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
   timers?: TimersSnapshot;
+  databasePools?: DatabasePoolsSnapshot;
 };
 
 const activeTrackers = new Set<TrackerName>();
@@ -38,6 +54,9 @@ const activeTrackers = new Set<TrackerName>();
  * @param options.trackers - Which trackers to enable. Defaults to "all" if not provided.
  * - `"all"`: Enable all available trackers
  * - `TrackerName[]`: Array of specific tracker names to enable
+ * @param options.databaseAdapters - Database pool adapters to register. Only used when databasePools tracker is enabled.
+ * - Defaults to `[pgAdapter, mysql2Adapter]` if not provided
+ * - Set to empty array to skip adapter registration
  *
  * @throws {Error} If leak detection is already set up. Call check() first.
  *
@@ -54,10 +73,20 @@ const activeTrackers = new Set<TrackerName>();
  *
  * // Enable multiple specific trackers
  * track({ trackers: ["eventListeners", "timers"] });
+ *
+ * // Enable database pools with custom adapters
+ * track({ trackers: ["databasePools"], databaseAdapters: [pgAdapter] });
  * ```
  */
-export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
+export function track(options?: {
+  trackers?: 'all' | TrackerName[];
+  databaseAdapters?: PoolAdapter[];
+}): void {
   const trackersToEnable = options?.trackers ?? 'all';
+  const databaseAdapters = options?.databaseAdapters ?? [
+    pgAdapter,
+    mysql2Adapter,
+  ];
 
   if (
     trackersToEnable === 'all' ||
@@ -70,6 +99,18 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
   if (trackersToEnable === 'all' || trackersToEnable.includes('timers')) {
     timers.track();
     activeTrackers.add('timers');
+  }
+
+  if (
+    trackersToEnable === 'all' ||
+    trackersToEnable.includes('databasePools')
+  ) {
+    // Register adapters
+    for (const adapter of databaseAdapters) {
+      registerPoolAdapter(adapter);
+    }
+    databasePools.track();
+    activeTrackers.add('databasePools');
   }
 }
 
@@ -90,7 +131,8 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
  * const snap = snapshot();
  * // snap = {
  * //   eventListeners: { 'EventEmitter#1': { data: 1 } },
- * //   timers: { setTimeout: 1, setInterval: 0 }
+ * //   timers: { setTimeout: 1, setInterval: 0 },
+ * //   databasePools: { 'pg#1': { active: 0, idle: 1, pending: 0, total: 1 } }
  * // }
  * ```
  */
@@ -103,6 +145,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('timers')) {
     result.timers = timers.snapshot();
+  }
+
+  if (activeTrackers.has('databasePools')) {
+    result.databasePools = databasePools.snapshot();
   }
 
   return result;
@@ -162,6 +208,9 @@ export async function check(options?: {
         case 'timers':
           await timers.check(checkOptions);
           break;
+        case 'databasePools':
+          await databasePools.check(checkOptions);
+          break;
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -170,6 +219,11 @@ export async function check(options?: {
         errors.push(String(error));
       }
     }
+  }
+
+  // Clear database pool adapters after checking
+  if (activeTrackers.has('databasePools')) {
+    clearPoolAdapters();
   }
 
   activeTrackers.clear();

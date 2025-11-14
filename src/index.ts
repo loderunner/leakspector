@@ -5,11 +5,16 @@ import {
   eventListeners,
   registerEmitterStringifier,
 } from './event-listeners';
+import {
+  type FileDescriptorsSnapshot,
+  fileDescriptors,
+} from './file-descriptors';
 import { type TimersSnapshot, timers } from './timers';
 
-export { eventListeners, timers };
+export { eventListeners, fileDescriptors, timers };
 export {
   type EmitterStringifier,
+  type FileDescriptorsSnapshot,
   type ListenersSnapshot,
   type TimersSnapshot,
   clearEmitterStringifiers,
@@ -19,13 +24,14 @@ export {
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'fileDescriptors' | 'timers';
 
 /**
  * Snapshot of all active trackers' current state.
  */
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
+  fileDescriptors?: FileDescriptorsSnapshot;
   timers?: TimersSnapshot;
 };
 
@@ -67,6 +73,14 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     activeTrackers.add('eventListeners');
   }
 
+  if (
+    trackersToEnable === 'all' ||
+    trackersToEnable.includes('fileDescriptors')
+  ) {
+    fileDescriptors.track();
+    activeTrackers.add('fileDescriptors');
+  }
+
   if (trackersToEnable === 'all' || trackersToEnable.includes('timers')) {
     timers.track();
     activeTrackers.add('timers');
@@ -99,6 +113,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('eventListeners')) {
     result.eventListeners = eventListeners.snapshot();
+  }
+
+  if (activeTrackers.has('fileDescriptors')) {
+    result.fileDescriptors = fileDescriptors.snapshot();
   }
 
   if (activeTrackers.has('timers')) {
@@ -158,6 +176,9 @@ export async function check(options?: {
       switch (trackerName) {
         case 'eventListeners':
           await eventListeners.check(checkOptions);
+          break;
+        case 'fileDescriptors':
+          await fileDescriptors.check(checkOptions);
           break;
         case 'timers':
           await timers.check(checkOptions);

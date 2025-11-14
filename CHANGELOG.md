@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.0](https://github.com/loderunner/leakspector/compare/0.0.3...0.1.0) (2025-11-14)
+
+
+### Features
+
+* track setTimeout/setInterval timers ([#13](https://github.com/loderunner/leakspector/issues/13)) ([4fc0a2b](https://github.com/loderunner/leakspector/commit/4fc0a2b7618a247398b6f5aed621749312e4bfd8))
+
+
+### Miscellaneous Chores
+
+* release 0.1.0 ([8a10dc6](https://github.com/loderunner/leakspector/commit/8a10dc6c102d54094039fb7d48ec2c54d3a54a43))
+
 ## [0.0.3](https://github.com/loderunner/leakspector/compare/0.0.2...0.0.3) (2025-11-13)
 
 

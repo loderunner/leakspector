@@ -3,6 +3,32 @@
 A Node.js library for detecting memory leaks. Track resources in your code and
 verify they're cleaned up properly.
 
+- [leakspector](#leakspector)
+  - [Overview](#overview)
+  - [Installation](#installation)
+  - [Usage](#usage)
+    - [Basic Setup with Vitest](#basic-setup-with-vitest)
+    - [Example Test](#example-test)
+    - [With Garbage Collection](#with-garbage-collection)
+    - [Suppress Errors (Debug Mode)](#suppress-errors-debug-mode)
+  - [What Gets Tracked](#what-gets-tracked)
+    - [Event Listeners](#event-listeners)
+      - [Built-in EventEmitter Identification](#built-in-eventemitter-identification)
+      - [Custom EventEmitter Stringifiers](#custom-eventemitter-stringifiers)
+        - [Basic Usage](#basic-usage)
+        - [Setup in Vitest](#setup-in-vitest)
+        - [Multiple Stringifiers](#multiple-stringifiers)
+        - [Pass-Through Behavior](#pass-through-behavior)
+    - [Timers](#timers)
+  - [API](#api)
+    - [`track(options?)`](#trackoptions)
+    - [`check(options?)`](#checkoptions)
+      - [Output Formats](#output-formats)
+        - [Short Format](#short-format)
+        - [Summary Format (Default)](#summary-format-default)
+        - [Details Format](#details-format)
+  - [License](#license)
+
 ## Overview
 
 leakspector helps you catch memory leaks in your code by tracking resource usage
@@ -11,7 +37,7 @@ runners to detect leaks in code under test, it can also be used outside of
 tests. Currently tracks:
 
 - **Event listeners** on `EventEmitter` instances
-- **Timers** (`setTimeout` and `setInterval`)
+- **Timers** `setTimeout` and `setInterval`
 
 ## Installation
 
@@ -134,115 +160,12 @@ afterEach(async () => {
 });
 ```
 
-## API
-
-### `track(options?)`
-
-Starts tracking resources in your code. When used in tests, call this in
-`beforeEach` before executing code that creates resources you want to track.
-
-**Parameters:**
-
-- `options.trackers` (optional): Which trackers to enable. Defaults to `"all"`
-  if not provided.
-  - `"all"`: Enable all available trackers (event listeners and timers)
-  - `TrackerName[]`: Array of specific tracker names to enable (e.g.,
-    `["eventListeners"]`, `["timers"]`, or `["eventListeners", "timers"]`)
-
-**Throws:** `Error` if tracking is already active. Call `check()` first to
-reset.
-
-**Examples:**
-
-```typescript
-// Enable all trackers (default)
-track();
-
-// Explicitly enable all trackers
-track({ trackers: 'all' });
-
-// Enable only event listeners
-track({ trackers: ['eventListeners'] });
-
-// Enable only timers
-track({ trackers: ['timers'] });
-
-// Enable multiple specific trackers
-track({ trackers: ['eventListeners', 'timers'] });
-```
-
-### `check(options?)`
-
-Checks for leaks by comparing current resource usage against the initial state.
-When used in tests, call this in `afterEach` to verify resources were cleaned
-up.
-
-**Parameters:**
-
-- `options.forceGC` (optional): Whether to force garbage collection before
-  checking. Defaults to `false`.
-- `options.throwOnLeaks` (optional): Whether to throw an error if leaks are
-  detected. Defaults to `true`.
-- `options.format` (optional): Output format for error messages. Defaults to
-  `"summary"`.
-  - `"short"`: Terse, leak count only
-  - `"summary"`: List of leaks with counts (default behavior)
-  - `"details"`: Detailed output with stack traces showing where leaks were
-    created
-
-**Returns:** `Promise<void>`
-
-**Throws:**
-
-- `Error` if tracking is not active (call `track()` first).
-- `Error` if leaks are detected and `throwOnLeaks` is `true`. Errors from
-  multiple trackers are aggregated.
-
-**Note:** After calling `check()`, tracking is reset. You must call `track()`
-again to start a new tracking session. When used in tests, call `track()` again
-in the next `beforeEach`. The function checks all active trackers and aggregates
-any errors found.
-
-#### Output Formats
-
-##### Short Format
-
-```typescript
-await check({ format: 'short' });
-// Error: Event listener leaks detected: 5 leaked listener(s)
-//
-// Timer leaks detected: 2 leaked timer(s)
-```
-
-##### Summary Format (Default)
-
-```typescript
-await check({ format: 'summary' });
-// Error: Event listener leaks detected:
-//   Event 'EventEmitter#1.error': expected 0 listener(s), found 1 (+1 leaked)
-//   Event 'EventEmitter#1.data': expected 0 listener(s), found 1 (+1 leaked)
-//
-// Timer leaks detected:
-//   setTimeout path/to/file.ts:42:5
-//   setInterval path/to/file.ts:88:12
-```
-
-##### Details Format
-
-```typescript
-await check({ format: 'details' });
-// Error: Event listener leaks detected:
-//   EventEmitter#1
-//   > 'error': expected 0 listener(s), found 2 (+2 leaked)
-//       * on('error') path/to/event-listening-file.ts:301:4
-//       * once('error') path/to/other/file.ts:22:2
-//
-// Timer leaks detected:
-//   setTimeout path/to/file.ts:42:5
-//   setInterval path/to/file.ts:88:12
-```
-
 ## What Gets Tracked
+
+Leakspector tracks the following resources:
+
+- [Event Listeners](#event-listeners)
+- [Timers](#timers)
 
 ### Event Listeners
 
@@ -370,10 +293,118 @@ The library patches global `setTimeout`, `setInterval`, `clearTimeout`, and
 `clearInterval` functions to monitor timer creation and cleanup. Original
 functions are restored after `check()` is called.
 
-## License
+## API
 
-Apache-2.0
+### `track(options?)`
 
+Starts tracking resources in your code. When used in tests, call this in
+`beforeEach` before executing code that creates resources you want to track.
+
+**Parameters:**
+
+- `options.trackers` (optional): Which trackers to enable. Defaults to `"all"`
+  if not provided.
+  - `"all"`: Enable all available trackers (event listeners and timers)
+  - `TrackerName[]`: Array of specific tracker names to enable (e.g.,
+    `["eventListeners"]`, `["timers"]`, or `["eventListeners", "timers"]`)
+
+**Throws:** `Error` if tracking is already active. Call `check()` first to
+reset.
+
+**Examples:**
+
+```typescript
+// Enable all trackers (default)
+track();
+
+// Explicitly enable all trackers
+track({ trackers: 'all' });
+
+// Enable only event listeners
+track({ trackers: ['eventListeners'] });
+
+// Enable only timers
+track({ trackers: ['timers'] });
+
+// Enable multiple specific trackers
+track({ trackers: ['eventListeners', 'timers'] });
 ```
 
+### `check(options?)`
+
+Checks for leaks by comparing current resource usage against the initial state.
+When used in tests, call this in `afterEach` to verify resources were cleaned
+up.
+
+**Parameters:**
+
+- `options.forceGC` (optional): Whether to force garbage collection before
+  checking. Defaults to `false`.
+- `options.throwOnLeaks` (optional): Whether to throw an error if leaks are
+  detected. Defaults to `true`.
+- `options.format` (optional): Output format for error messages. Defaults to
+  `"summary"`.
+  - `"short"`: Terse, leak count only
+  - `"summary"`: List of leaks with counts (default behavior)
+  - `"details"`: Detailed output with stack traces showing where leaks were
+    created
+
+**Returns:** `Promise<void>`
+
+**Throws:**
+
+- `Error` if tracking is not active (call `track()` first).
+- `Error` if leaks are detected and `throwOnLeaks` is `true`. Errors from
+  multiple trackers are aggregated.
+
+**Note:** After calling `check()`, tracking is reset. You must call `track()`
+again to start a new tracking session. When used in tests, call `track()` again
+in the next `beforeEach`. The function checks all active trackers and aggregates
+any errors found.
+
+#### Output Formats
+
+##### Short Format
+
+```typescript
+await check({ format: 'short' });
+// Error: Event listener leaks detected: 5 leaked listener(s)
+//
+// Timer leaks detected: 2 leaked timer(s)
+```
+
+##### Summary Format (Default)
+
+```typescript
+await check({ format: 'summary' });
+// Error: Event listener leaks detected:
+//   Event 'EventEmitter#1.error': expected 0 listener(s), found 1 (+1 leaked)
+//   Event 'EventEmitter#1.data': expected 0 listener(s), found 1 (+1 leaked)
+//
+// Timer leaks detected:
+//   setTimeout path/to/file.ts:42:5
+//   setInterval path/to/file.ts:88:12
+```
+
+##### Details Format
+
+```typescript
+await check({ format: 'details' });
+// Error: Event listener leaks detected:
+//   EventEmitter#1
+//   > 'error': expected 0 listener(s), found 2 (+2 leaked)
+//       * on('error') path/to/event-listening-file.ts:301:4
+//       * once('error') path/to/other/file.ts:22:2
+//
+// Timer leaks detected:
+//   setTimeout path/to/file.ts:42:5
+//   setInterval path/to/file.ts:88:12
+```
+
+## License
+
+[Apache-2.0](LICENSE)
+
+```
+Copyright 2025 Charles Francoise
 ```

@@ -6,12 +6,14 @@ import {
   registerEmitterStringifier,
 } from './event-listeners';
 import { type TimersSnapshot, timers } from './timers';
+import { type WorkersSnapshot, workers } from './workers';
 
-export { eventListeners, timers };
+export { eventListeners, timers, workers };
 export {
   type EmitterStringifier,
   type ListenersSnapshot,
   type TimersSnapshot,
+  type WorkersSnapshot,
   clearEmitterStringifiers,
   registerEmitterStringifier,
 };
@@ -19,7 +21,7 @@ export {
 /**
  * Type representing available leak tracker names.
  */
-export type TrackerName = 'eventListeners' | 'timers';
+export type TrackerName = 'eventListeners' | 'timers' | 'workers';
 
 /**
  * Snapshot of all active trackers' current state.
@@ -27,6 +29,7 @@ export type TrackerName = 'eventListeners' | 'timers';
 export type Snapshot = {
   eventListeners?: ListenersSnapshot;
   timers?: TimersSnapshot;
+  workers?: WorkersSnapshot;
 };
 
 const activeTrackers = new Set<TrackerName>();
@@ -71,6 +74,11 @@ export function track(options?: { trackers?: 'all' | TrackerName[] }): void {
     timers.track();
     activeTrackers.add('timers');
   }
+
+  if (trackersToEnable === 'all' || trackersToEnable.includes('workers')) {
+    workers.track();
+    activeTrackers.add('workers');
+  }
 }
 
 /**
@@ -103,6 +111,10 @@ export function snapshot(): Snapshot {
 
   if (activeTrackers.has('timers')) {
     result.timers = timers.snapshot();
+  }
+
+  if (activeTrackers.has('workers')) {
+    result.workers = workers.snapshot();
   }
 
   return result;
@@ -161,6 +173,9 @@ export async function check(options?: {
           break;
         case 'timers':
           await timers.check(checkOptions);
+          break;
+        case 'workers':
+          await workers.check(checkOptions);
           break;
       }
     } catch (error) {

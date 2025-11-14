@@ -8,7 +8,8 @@ each test and verify they're cleaned up at the end.
 leakspector helps you catch memory leaks in your tests by tracking resource
 usage and comparing it against the initial state. Currently tracks:
 
-- **Event listeners** on EventEmitter instances
+- **Event listeners** on `EventEmitter` instances
+- **Timers** (`setTimeout` and `setInterval`)
 
 ## Installation
 
@@ -64,6 +65,17 @@ describe('my feature', () => {
     emitter.on('data', handler);
     // Forgot to remove handler - test will fail in afterEach
   });
+
+  it('should clean up timers', () => {
+    const id = setTimeout(() => {}, 1000);
+    clearTimeout(id); // Properly cleaned up
+    // Test passes - no leaks detected
+  });
+
+  it('should fail if timers leak', () => {
+    setTimeout(() => {}, 1000);
+    // Forgot to clear timer - test will fail in afterEach
+  });
 });
 ```
 
@@ -111,13 +123,40 @@ afterEach(async () => {
 
 ## API
 
-### `track()`
+### `track(options?)`
 
 Starts tracking resources. Call this in `beforeEach` before creating any
 resources you want to track.
 
+**Parameters:**
+
+- `options.trackers` (optional): Which trackers to enable. Defaults to `"all"`
+  if not provided.
+  - `"all"`: Enable all available trackers (event listeners and timers)
+  - `TrackerName[]`: Array of specific tracker names to enable (e.g.,
+    `["eventListeners"]`, `["timers"]`, or `["eventListeners", "timers"]`)
+
 **Throws:** `Error` if tracking is already active. Call `check()` first to
 reset.
+
+**Examples:**
+
+```typescript
+// Enable all trackers (default)
+track();
+
+// Explicitly enable all trackers
+track({ trackers: 'all' });
+
+// Enable only event listeners
+track({ trackers: ['eventListeners'] });
+
+// Enable only timers
+track({ trackers: ['timers'] });
+
+// Enable multiple specific trackers
+track({ trackers: ['eventListeners', 'timers'] });
+```
 
 ### `check(options?)`
 
@@ -142,10 +181,12 @@ Call this in `afterEach`.
 **Throws:**
 
 - `Error` if tracking is not active (call `track()` first).
-- `Error` if leaks are detected and `throwOnLeaks` is `true`.
+- `Error` if leaks are detected and `throwOnLeaks` is `true`. Errors from
+  multiple trackers are aggregated.
 
 **Note:** After calling `check()`, tracking is reset. You must call `track()`
-again in the next `beforeEach` to start a new tracking session.
+again in the next `beforeEach` to start a new tracking session. The function
+checks all active trackers and aggregates any errors found.
 
 #### Output Formats
 
@@ -154,6 +195,8 @@ again in the next `beforeEach` to start a new tracking session.
 ```typescript
 await check({ format: 'short' });
 // Error: Event listener leaks detected: 5 leaked listener(s)
+//
+// Timer leaks detected: 2 leaked timer(s)
 ```
 
 ##### Summary Format (Default)
@@ -163,6 +206,10 @@ await check({ format: 'summary' });
 // Error: Event listener leaks detected:
 //   Event 'EventEmitter#1.error': expected 0 listener(s), found 1 (+1 leaked)
 //   Event 'EventEmitter#1.data': expected 0 listener(s), found 1 (+1 leaked)
+//
+// Timer leaks detected:
+//   setTimeout path/to/file.ts:42:5
+//   setInterval path/to/file.ts:88:12
 ```
 
 ##### Details Format
@@ -174,6 +221,10 @@ await check({ format: 'details' });
 //   > 'error': expected 0 listener(s), found 2 (+2 leaked)
 //       * on('error') path/to/event-listening-file.ts:301:4
 //       * once('error') path/to/other/file.ts:22:2
+//
+// Timer leaks detected:
+//   setTimeout path/to/file.ts:42:5
+//   setInterval path/to/file.ts:88:12
 ```
 
 ## What Gets Tracked
@@ -287,6 +338,22 @@ registerEmitterStringifier((emitter) => {
   }
 });
 ```
+
+### Timers
+
+Tracks `setTimeout` and `setInterval` calls. Detects leaks when timers are
+created but not cleared.
+
+```typescript
+track();
+const id = setTimeout(() => {}, 1000);
+// If timer isn't cleared before check() is called, a leak is detected
+clearTimeout(id); // Properly cleaned up
+```
+
+The library patches global `setTimeout`, `setInterval`, `clearTimeout`, and
+`clearInterval` functions to monitor timer creation and cleanup. Original
+functions are restored after `check()` is called.
 
 ## License
 

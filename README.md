@@ -1,12 +1,14 @@
 # leakspector
 
-A Node.js library for detecting memory leaks. Track resources at the start of
-each test and verify they're cleaned up at the end.
+A Node.js library for detecting memory leaks. Track resources in your code and
+verify they're cleaned up properly.
 
 ## Overview
 
-leakspector helps you catch memory leaks in your tests by tracking resource
-usage and comparing it against the initial state. Currently tracks:
+leakspector helps you catch memory leaks in your code by tracking resource
+usage and comparing it against the initial state. While commonly used within
+test runners to detect leaks in code under test, it can also be used outside
+of tests. Currently tracks:
 
 - **Event listeners** on `EventEmitter` instances
 - **Timers** (`setTimeout` and `setInterval`)
@@ -25,7 +27,8 @@ bun add --dev leakspector
 
 ## Usage
 
-Leakspector is best used in conjunction with a test runner like Vitest.
+Leakspector is commonly used within test runners like Vitest to detect leaks
+in the code being tested, but can also be used outside of tests.
 
 ### Basic Setup with Vitest
 
@@ -55,7 +58,7 @@ describe('my feature', () => {
 
     emitter.on('data', handler);
     emitter.off('data', handler); // Properly cleaned up
-    // Test passes - no leaks detected
+    // Test passes - no leaks detected in the code under test
   });
 
   it('should fail if listeners leak', () => {
@@ -63,18 +66,18 @@ describe('my feature', () => {
     const handler = () => {};
 
     emitter.on('data', handler);
-    // Forgot to remove handler - test will fail in afterEach
+    // Forgot to remove handler - leak detected in code under test, test fails in afterEach
   });
 
   it('should clean up timers', () => {
     const id = setTimeout(() => {}, 1000);
     clearTimeout(id); // Properly cleaned up
-    // Test passes - no leaks detected
+    // Test passes - no leaks detected in the code under test
   });
 
   it('should fail if timers leak', () => {
     setTimeout(() => {}, 1000);
-    // Forgot to clear timer - test will fail in afterEach
+    // Forgot to clear timer - leak detected in code under test, test fails in afterEach
   });
 });
 ```
@@ -125,8 +128,8 @@ afterEach(async () => {
 
 ### `track(options?)`
 
-Starts tracking resources. Call this in `beforeEach` before creating any
-resources you want to track.
+Starts tracking resources in your code. When used in tests, call this in
+`beforeEach` before executing code that creates resources you want to track.
 
 **Parameters:**
 
@@ -161,7 +164,7 @@ track({ trackers: ['eventListeners', 'timers'] });
 ### `check(options?)`
 
 Checks for leaks by comparing current resource usage against the initial state.
-Call this in `afterEach`.
+When used in tests, call this in `afterEach` to verify resources were cleaned up.
 
 **Parameters:**
 
@@ -185,8 +188,9 @@ Call this in `afterEach`.
   multiple trackers are aggregated.
 
 **Note:** After calling `check()`, tracking is reset. You must call `track()`
-again in the next `beforeEach` to start a new tracking session. The function
-checks all active trackers and aggregates any errors found.
+again to start a new tracking session. When used in tests, call `track()` again
+in the next `beforeEach`. The function checks all active trackers and aggregates
+any errors found.
 
 #### Output Formats
 

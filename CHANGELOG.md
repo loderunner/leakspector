@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.0](https://github.com/loderunner/leakspector/compare/0.1.1...0.2.0) (2025-11-15)
+
+
+### Features
+
+* add snapshot API for inspecting tracker state ([#17](https://github.com/loderunner/leakspector/issues/17)) ([5afa611](https://github.com/loderunner/leakspector/commit/5afa611015873ec3c915e2ca052d22808f2812ee))
+
+
+### Bug Fixes
+
+* release expired setTimeouts from tracking ([#19](https://github.com/loderunner/leakspector/issues/19)) ([7fb03fb](https://github.com/loderunner/leakspector/commit/7fb03fb840e30fd49b7b7d0bbbb092f88b96660e))
+
+
+### Miscellaneous Chores
+
+* release 0.2.0 ([4e55324](https://github.com/loderunner/leakspector/commit/4e5532431527f50c60dc1af927d123078ca35845))
+
 ## [0.1.1](https://github.com/loderunner/leakspector/compare/0.1.0...0.1.1) (2025-11-14)
 
 

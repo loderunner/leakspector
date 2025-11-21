@@ -22,7 +22,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup pnpm
         if: ${{ steps.release.outputs.release_created }}
         uses: pnpm/action-setup@v4

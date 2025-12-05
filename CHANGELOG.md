@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/loderunner/leakspector/compare/0.2.0...0.2.1) (2025-12-05)
+
+
+### Bug Fixes
+
+* bump actions/checkout from 5 to 6 ([#25](https://github.com/loderunner/leakspector/issues/25)) ([79f7190](https://github.com/loderunner/leakspector/commit/79f7190c6e2536dd236aee389ed3db13fb8aae19))
+
 ## [0.2.0](https://github.com/loderunner/leakspector/compare/0.1.1...0.2.0) (2025-11-15)
 
 
